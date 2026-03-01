@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+  --bg-light: #f8fafc;
+  --white: #ffffff;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--bg-light);
+  color: #0f172a;
+}
+
+.form-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 16px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* EFECTOS DEL SIDEBAR */
+.nav-item {
+  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
+  border-radius: 14px; text-decoration: none; font-weight: 600;
+  color: #bfdbfe; background-color: transparent;
+  transition: all 0.2s ease; margin-bottom: 8px;
+}
+.nav-item:hover {
+  background-color: rgba(255,255,255,0.15); color: white; transform: translateX(8px);
+}
+.nav-item.active {
+  background-color: white; color: var(--primary); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  transform: translateX(0); /* Evita que el activo se mueva en hover */
+}
+
+.logout-btn {
+  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,0.2);
+  background-color: transparent; color: #fca5a5; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; width: 100%;
+}
+.logout-btn:hover {
+  background-color: #ef4444; color: white; border-color: #ef4444;
+}
+
+/* COMPONENTES GLOBALES (TOAST Y MODAL) */
+.toast-notification {
+  position: fixed; bottom: 24px; right: 24px; padding: 16px 24px;
+  border-radius: 12px; display: flex; align-items: center; gap: 12px;
+  color: white; font-weight: 600; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+  animation: slideInRight 0.4s ease-out forwards; z-index: 9999;
+}
+.toast-notification.success { background-color: var(--success); border-left: 6px solid #047857; }
+.toast-notification.error { background-color: var(--danger); border-left: 6px solid #b91c1c; }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.modal-overlay {
+  position: fixed; inset: 0; background-color: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: center; z-index: 1000;
+}
+.modal-content {
+  background-color: white; padding: 32px; border-radius: 16px;
+  width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+/* ==========================================================================
+   ESTILOS DEL SCROLLBAR (Personalizado para SchoolWaySV)
+   ========================================================================== */
+
+/* Ancho y alto de la barra */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* El fondo por donde se desliza la barra */
+::-webkit-scrollbar-track {
+  background: var(--bg-light); 
+  border-radius: 10px;
+}
+
+/* La barra deslizable en sí */
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Gris azulado suave en estado normal */
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+/* La barra deslizable al pasar el mouse */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary); /* Azul principal de la marca */
+}
