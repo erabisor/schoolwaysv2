@@ -11,6 +11,8 @@ services:
       - REACT_APP_API_URL=${REACT_APP_API_URL}
     depends_on:
       - backend
+    networks:
+      - schoolways_net
 
   backend:
     build: ./backend
@@ -27,3 +29,9 @@ services:
       - DB_SERVER=${DB_SERVER}
       - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - schoolways_net
+
+networks:
+  schoolways_net:
+    external: true
