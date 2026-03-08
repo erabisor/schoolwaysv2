@@ -29,6 +29,8 @@ services:
       - DB_SERVER=${DB_SERVER}
       - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
     networks:
       - schoolways_net
 

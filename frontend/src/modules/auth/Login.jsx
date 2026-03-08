@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bus } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../api/axios';
+import { Link } from 'react-router-dom';
 
 const Login = () => {
   const [correo, setCorreo] = useState('');
@@ -71,11 +72,20 @@ const Login = () => {
             required 
           />
 
-          {/* Enlace estético de recuperación para la Fase 4 */}
-          <div style={{ textAlign: 'right', marginBottom: '16px' }}>
-            <span style={{ fontSize: '14px', color: 'var(--primary)', cursor: 'pointer', fontWeight: '500' }}>
+          {/* Enlace de recuperación de contraseña */}
+         <div style={{ textAlign: 'right', marginBottom: '16px' }}>
+            <Link 
+              to="/olvide-password" 
+              style={{ 
+                fontSize: '14px', 
+                color: 'var(--primary)', 
+                cursor: 'pointer', 
+                fontWeight: '500',
+                textDecoration: 'none' // Evita el subrayado automático de los enlaces
+              }}
+            >
               ¿Olvidaste tu contraseña?
-            </span>
+            </Link>
           </div>
           
           <button type="submit" style={{ width: '100%', padding: '14px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>

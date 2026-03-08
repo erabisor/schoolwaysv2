@@ -11,7 +11,9 @@ import Rutas from './modules/rutas/Rutas';
 import Alumnos from './modules/alumnos/Alumnos';
 import Asistencias from './modules/asistencias/Asistencias';
 import MonitoreoTurnos from './modules/asistencias/MonitoreoTurnos';
-import HistorialTurnos from './modules/asistencias/HistorialTurnos'; // IMPORT NUEVO
+import HistorialTurnos from './modules/asistencias/HistorialTurnos';
+import OlvidePassword from './modules/auth/OlvidePassword';
+import ResetPassword from './modules/auth/ResetPassword'; 
 
 const TempDashboard = () => (
   <div>
@@ -35,9 +37,9 @@ function App() {
           <Route path="/alumnos" element={<ProtectedRoute rolesPermitidos={[1]}><Alumnos /></ProtectedRoute>} />
           <Route path="/asistencias" element={<ProtectedRoute rolesPermitidos={[1]}><Asistencias /></ProtectedRoute>} />
           <Route path="/monitoreo" element={<ProtectedRoute rolesPermitidos={[1]}><MonitoreoTurnos /></ProtectedRoute>} />
-          
-          {/* RUTA NUEVA: El historial de viajes */}
           <Route path="/historial" element={<ProtectedRoute rolesPermitidos={[1]}><HistorialTurnos /></ProtectedRoute>} />
+          <Route path="/olvide-password" element={<OlvidePassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -7,6 +7,7 @@ const conductoresRoutes = require('./modules/conductores/conductores.routes');
 const rutasRoutes = require('./modules/rutas/rutas.routes');
 const alumnosRoutes = require('./modules/alumnos/alumnos.routes');
 const asistenciasRoutes = require('./modules/asistencias/asistencias.routes');
+const usuariosRoutes = require('./modules/usuarios/usuarios.routes');
 
 const app = express();
 
@@ -17,7 +18,6 @@ app.use(express.json());
 
 // Registra las rutas de los módulos
 app.use('/api/auth', authRoutes);
-const usuariosRoutes = require('./modules/usuarios/usuarios.routes');
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/vehiculos', vehiculosRoutes);
 app.use('/api/conductores', conductoresRoutes);
