@@ -8,4 +8,8 @@ docker compose down
 echo "🚀 3. Reconstruyendo y levantando producción..."
 docker compose up -d --build
 
+echo "🚀 4. Copiando variables de entorno a prod"
+cp .env /root/schoolwaysv2/frontend/
+
+
 echo "✅ ¡Actualización de SchoolWaySV completada con éxito!"
