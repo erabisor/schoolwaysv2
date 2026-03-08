@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+
+// Importación de rutas
 const authRoutes = require('./modules/auth/auth.routes');
 const vehiculosRoutes = require('./modules/vehiculos/vehiculos.routes');
 const conductoresRoutes = require('./modules/conductores/conductores.routes');
@@ -11,35 +13,26 @@ const usuariosRoutes = require('./modules/usuarios/usuarios.routes');
 
 const app = express();
 
-// 1. Definir la lista de dominios permitidos (Whitelist)
-const dominiosPermitidos = [
-  'https://www.schoolwaysv.online',
-  'https://schoolwaysv.online', // Por si entran sin el www
-  'http://localhost:3000'        // Para que sigan probando en su PC
-];
-
+// 1. Configuración de CORS
+// Esta configuración permite que tu Frontend en www.schoolwaysv.online se comunique con la API
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Permitir peticiones sin origen (como Postman o apps móviles)
-    if (!origin) return callback(null, true);
-    
-    if (dominiosPermitidos.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('No permitido por CORS - SchoolWaySV Security'));
-    }
-  },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true, // Crucial para que el token de recuperación viaje seguro
+  origin: [
+    'https://www.schoolwaysv.online', 
+    'https://schoolwaysv.online',
+    'http://localhost:3000' // Para pruebas locales
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
   optionsSuccessStatus: 204
 };
 
-// Aplica middlewares de seguridad y parseo
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
+// 2. Aplicación de Middlewares Globales
+app.use(helmet()); // Seguridad en encabezados HTTP
+app.use(cors(corsOptions)); // Aplicamos CORS con las opciones definidas arriba
+app.use(express.json()); // Permite procesar JSON en el cuerpo de las peticiones
 
-// Registra las rutas de los módulos
+// 3. Registro de las rutas de los módulos
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/vehiculos', vehiculosRoutes);
@@ -48,4 +41,5 @@ app.use('/api/rutas', rutasRoutes);
 app.use('/api/alumnos', alumnosRoutes);
 app.use('/api/asistencias', asistenciasRoutes);
 
+// Exportación de la configuración para server.js
 module.exports = app;

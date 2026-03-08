@@ -1,15 +1,20 @@
 #!/bin/bash
-echo "🔄 1. Descargando últimos cambios de GitHub..."
-git pull
+# Detener el script si algo falla
+set -e
 
-echo "🛑 2. Apagando contenedores antiguos..."
+echo "🔄 1. Sincronizando código con GitHub (Forzado)..."
+git fetch --all
+git reset --hard origin/main
+
+echo "📂 2. Preparando variables de entorno para el Build de React..."
+# Lo copiamos ANTES de construir para que React lo vea
+cp .env ./frontend/
+
+echo "🛑 3. Limpiando contenedores antiguos..."
 docker compose down
 
-echo "🚀 3. Reconstruyendo y levantando producción..."
+echo "🚀 4. Reconstruyendo imágenes y levantando producción..."
+# Aquí es donde React "suelda" la URL de la API en el código
 docker compose up -d --build
-
-echo "🚀 4. Copiando variables de entorno a prod"
-cp .env /root/schoolwaysv2/frontend/
-
 
 echo "✅ ¡Actualización de SchoolWaySV completada con éxito!"
