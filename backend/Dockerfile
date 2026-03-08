@@ -1,9 +1,13 @@
 FROM node:18-alpine
 
+# Declaramos el entorno de producción
+ENV NODE_ENV=production
+
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install
+# Instalamos solo las dependencias estrictamente necesarias para producción
+RUN npm install --only=production
 
 COPY . .
 
