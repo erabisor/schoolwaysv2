@@ -1,14 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('./auth.controller');
+const { loginLimiter } = require('../../middleware/rateLimit');
 
-// Expone el endpoint POST para iniciar sesión
-router.post('/login', authController.login);
+// Máximo 10 intentos de login por IP cada 15 minutos
+router.post('/login', loginLimiter, authController.login);
 
-// Expone el endpoint POST para solicitar el correo
-router.post('/olvide-password', authController.olvidePassword);
-
-// Expone el endpoint POST para recuperar contraseña
-router.post('/reset-password', authController.resetPassword);
+router.post('/olvide-password', loginLimiter, authController.olvidePassword);
+router.post('/reset-password', loginLimiter, authController.resetPassword);
 
 module.exports = router;

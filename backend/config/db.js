@@ -1,26 +1,28 @@
 const sql = require('mssql');
 require('dotenv').config();
 
-// Configura las credenciales de SQL Server
 const dbConfig = {
-  user: process.env.DB_USER,
+  user:     process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
+  server:   process.env.DB_SERVER,
   database: process.env.DB_NAME,
-  port: parseInt(process.env.DB_PORT, 10) || 1433,
+  port:     parseInt(process.env.DB_PORT, 10) || 1433,
   options: {
-    encrypt: false, // En local o Docker va en false
-    trustServerCertificate: true
+    // En producción (NODE_ENV=production) se activa el cifrado TLS
+    encrypt: process.env.NODE_ENV === 'production',
+    trustServerCertificate: process.env.NODE_ENV !== 'production'
   }
 };
 
-// Crea la conexión una sola vez para reutilizarla
 const poolPromise = new sql.ConnectionPool(dbConfig)
   .connect()
   .then(pool => {
-    console.log('✅ Conectado a SQL Server');
+    console.log('[db] Conectado a SQL Server');
     return pool;
   })
-  .catch(err => console.log('❌ Error de BD: ', err));
+  .catch(err => {
+    console.error('[db] Error de conexion:', err.message);
+    process.exit(1); // Si no hay BD, el servidor no debe seguir corriendo
+  });
 
 module.exports = { sql, poolPromise };

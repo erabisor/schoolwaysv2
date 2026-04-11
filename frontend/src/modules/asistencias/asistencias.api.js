@@ -8,7 +8,7 @@ export const finalizarViaje = (viajeId) => api.put(`/asistencias/viajes/${viajeI
 export const registrarEvento = (datos) => api.post('/asistencias/evento', datos);
 export const deshacerEvento = (datos) => api.delete('/asistencias/evento/deshacer', { data: datos });
 export const recuperarSesion = (conductorId) => api.get(`/asistencias/sesion/${conductorId}`);
-
+export const getRutaOptimizada = (rutaId, lat, lng, sentido) => api.get(`/viajes/optimizada/${rutaId}?lat=${lat}&lng=${lng}&sentido=${sentido}`);
 export const getTurnosAbiertos = () => api.get('/asistencias/turnos/abiertos');
 export const reasignarTurno = (turnoId, nuevoConductorId) => api.put(`/asistencias/turnos/${turnoId}/reasignar`, { nuevoConductorId });
 export const forzarCierreTurno = (turnoId) => api.put(`/asistencias/turnos/${turnoId}/forzar-cierre`);

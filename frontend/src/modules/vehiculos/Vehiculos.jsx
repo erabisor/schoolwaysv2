@@ -9,8 +9,8 @@ import Toast from '../../components/Toast';
 
 const Vehiculos = () => {
   const [vehiculos, setVehiculos] = useState([]);
-  const [busqueda, setBusqueda] = useState(''); 
-  const [filtroEstado, setFiltroEstado] = useState(''); 
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [vehiculoAEditar, setVehiculoAEditar] = useState(null);
   const [vehiculoAEliminar, setVehiculoAEliminar] = useState(null);
@@ -23,7 +23,7 @@ const Vehiculos = () => {
 
   const cargarDatos = async () => {
     try {
-      const res = await getVehiculos(); setVehiculos(res.data.data); setSeleccionados([]); 
+      const res = await getVehiculos(); setVehiculos(res.data.data); setSeleccionados([]);
     } catch (error) { mostrarToast('Error al cargar', 'error'); }
   };
 
@@ -32,7 +32,7 @@ const Vehiculos = () => {
 
   const handleGuardar = async (datos) => {
     try {
-      if (vehiculoAEditar) { await editarVehiculo(vehiculoAEditar.VehiculoID, datos); } 
+      if (vehiculoAEditar) { await editarVehiculo(vehiculoAEditar.VehiculoID, datos); }
       else { await crearVehiculo(datos); }
       setModalAbierto(false); cargarDatos(); mostrarToast('Operación exitosa', 'success');
     } catch (error) { mostrarToast('Error', 'error'); }
@@ -82,20 +82,31 @@ const Vehiculos = () => {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#0f172a' }}>Vehículos</h1>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '8px 16px', borderRadius: '10px', border: '1.5px solid var(--border)' }}><Search size={18} color="var(--text-muted)" /><input type="text" placeholder="Buscar placa o marca..." style={{ border: 'none', outline: 'none', width: '200px', fontWeight: '500' }} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 16px', borderRadius: '10px', border: '1.5px solid var(--border)' }}><Filter size={18} color="var(--text-muted)" /><select style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontWeight: '500', padding: '8px 0', cursor: 'pointer' }} value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}><option value="">Todos</option><option value="1">En Ruta</option><option value="0">En Taller</option></select></div>
-          <button onClick={exportarCSV} style={{ background: 'white', color: '#0f172a', padding: '10px 16px', borderRadius: '10px', fontWeight: '700', border: '1.5px solid var(--border)', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}><Download size={20} color="var(--primary)" /> Exportar</button>
-          <button onClick={() => { setVehiculoAEditar(null); setModalAbierto(true); }} style={{ background: 'var(--primary)', color: 'white', padding: '12px 24px', borderRadius: '10px', fontWeight: '800', border: 'none', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}><Plus size={20} /> Nuevo Vehículo</button>
+
+      <div className="page-header">
+        <h1>Vehículos</h1>
+        <div className="header-actions">
+          <div className="search-box">
+            <Search size={18} color="var(--text-muted)" />
+            <input type="text" placeholder="Buscar placa o marca..." className="search-input" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          </div>
+          <div className="filter-box">
+            <Filter size={18} color="var(--text-muted)" />
+            <select className="filter-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="1">En Ruta</option>
+              <option value="0">En Taller</option>
+            </select>
+          </div>
+          <button onClick={exportarCSV} className="btn-secondary"><Download size={20} color="var(--primary)" /> Exportar</button>
+          <button onClick={() => { setVehiculoAEditar(null); setModalAbierto(true); }} className="btn-primary"><Plus size={20} /> Nuevo Vehículo</button>
         </div>
       </div>
 
       {seleccionados.length > 0 && (
-        <div style={{ background: '#e0f2fe', padding: '16px 24px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', border: '1px solid #bae6fd' }}>
+        <div className="bulk-bar">
           <span style={{ fontWeight: '800', color: '#0369a1', fontSize: '15px' }}>{seleccionados.length} vehículos seleccionados</span>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="bulk-bar-actions">
             <button onClick={() => handleAccionMasiva('estado', true)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#d1fae5', color: '#059669', fontWeight: '700', cursor: 'pointer', display: 'flex', gap: '6px' }}><Power size={16} /> En Ruta</button>
             <button onClick={() => handleAccionMasiva('estado', false)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fef08a', color: '#854d0e', fontWeight: '700', cursor: 'pointer', display: 'flex', gap: '6px' }}><Power size={16} /> En Taller</button>
             <button onClick={() => handleAccionMasiva('eliminar')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fee2e2', color: '#dc2626', fontWeight: '700', cursor: 'pointer', display: 'flex', gap: '6px' }}><Trash2 size={16} /> Eliminar</button>
@@ -103,7 +114,7 @@ const Vehiculos = () => {
         </div>
       )}
 
-      <div style={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', background: 'white' }}>
+      <div className="table-card">
         <VehiculosTabla vehiculos={vehiculosPaginados} onToggleEstado={handleToggleEstado} onEdit={(v) => { setVehiculoAEditar(v); setModalAbierto(true); }} onDelete={setVehiculoAEliminar} seleccionados={seleccionados} onSelect={handleSelect} onSelectAll={handleSelectAll} />
         <Pagination paginaActual={paginaActual} totalPaginas={totalPaginas} onPageChange={setPaginaActual} registrosPorPagina={registrosPorPagina} onRegistrosChange={(val) => { setRegistrosPorPagina(val); setPaginaActual(1); }} totalRegistros={totalRegistros} />
       </div>

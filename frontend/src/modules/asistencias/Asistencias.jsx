@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Square, Bus, AlertCircle, Sunrise, Sunset, Power, LogIn, LogOut, XCircle, MessageSquare, RotateCcw, Clock } from 'lucide-react';
-import { getRutasDisponibles, abrirTurno, cerrarTurno, iniciarViaje, finalizarViaje, registrarEvento, deshacerEvento, recuperarSesion } from './asistencias.api';
+import React, { useState, useEffect, useContext } from 'react';
+import { 
+  Bus, Sunrise, Sunset, Power, LogIn, LogOut, X, 
+  MessageSquare, RotateCcw, Map as MapIcon, Square, AlertCircle
+} from 'lucide-react';
+import { 
+  getRutasDisponibles, abrirTurno, cerrarTurno, iniciarViaje, 
+  finalizarViaje, registrarEvento, deshacerEvento, recuperarSesion,
+  getRutaOptimizada 
+} from './asistencias.api';
+import { AuthContext } from '../../context/AuthContext';
+import MapaRuta from './MapaRuta'; 
 import Toast from '../../components/Toast';
 
 const Asistencias = () => {
+  const { user } = useContext(AuthContext); 
   const [rutas, setRutas] = useState([]);
   const [rutaSeleccionada, setRutaSeleccionada] = useState('');
   
@@ -11,384 +21,413 @@ const Asistencias = () => {
   const [viajeActivo, setViajeActivo] = useState(null); 
   const [alumnos, setAlumnos] = useState([]);
   
+  const [datosMapa, setDatosMapa] = useState({ polilinea: [], paradas: [] });
   const [eventosRegistrados, setEventosRegistrados] = useState({}); 
   const [viajesRealizados, setViajesRealizados] = useState({ Ida: false, Vuelta: false });
-  
   const [modalAbierto, setModalAbierto] = useState({ mostrar: false, titulo: '', mensaje: '', colorBoton: '', accion: null });
   const [toast, setToast] = useState({ mensaje: '', tipo: '' });
-  
   const [procesando, setProcesando] = useState(false); 
 
   const mostrarToast = (mensaje, tipo) => setToast({ mensaje, tipo });
-  const conductorIdTemporal = 1; 
 
-  useEffect(() => {
-    const cargarTodo = async () => {
+  const esAdmin = user?.rol === 1;
+  const idUsuario = user?.id; 
+  const idConductorReal = user?.conductorId; 
+
+useEffect(() => {
+    const cargarDatosIniciales = async () => {
       try {
         const resRutas = await getRutasDisponibles();
-        setRutas(resRutas.data.data.filter(r => r.Estado === true));
+        let activas = (resRutas.data.data || []).filter(r => r.Estado == 1 || r.Estado === true);
 
-        const resSesion = await recuperarSesion(conductorIdTemporal);
-        const sesion = resSesion.data.data;
+        // FIX: SECUESTRO DE RUTAS
+        // Si es conductor (Rol 2), filtramos para que SOLO vea su ruta asignada
+        if (user?.rol === 2 && idConductorReal) {
+          activas = activas.filter(r => Number(r.ConductorID) === Number(idConductorReal));
+        }
+        setRutas(activas);
 
-        if (sesion.turno) {
-          setTurnoActivo(sesion.turno);
-          setRutaSeleccionada(sesion.turno.RutaID.toString());
-          setViajesRealizados(sesion.viajesRealizados);
+        if (user?.rol === 2 && idUsuario) {
+          const resSesion = await recuperarSesion(idUsuario);
+          if (resSesion.data.success && resSesion.data.data.turno) {
+            const { turno, viaje, alumnos, eventos, historial } = resSesion.data.data;
+            setTurnoActivo(turno);
+            setRutaSeleccionada(turno.RutaID);
+            
+            if (viaje) {
+              setViajeActivo(viaje);
+              setAlumnos(alumnos || []);
+              
+              const eventosMap = {};
+              (eventos || []).forEach(e => { eventosMap[e.AlumnoID] = e.TipoEvento; });
+              setEventosRegistrados(eventosMap);
 
-          if (sesion.viaje) {
-            setViajeActivo(sesion.viaje);
-            setAlumnos(sesion.alumnos);
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                  try {
+                    const resMapa = await getRutaOptimizada(turno.RutaID, pos.coords.latitude, pos.coords.longitude, viaje.Sentido);
+                    if (resMapa.data.ok) setDatosMapa(resMapa.data.data);
+                  } catch (e) { console.error("Error recuperando mapa"); }
+                });
+              }
+            }
 
-            const mapaEventos = {};
-            sesion.eventos.forEach(ev => {
-              if (!mapaEventos[ev.AlumnoID]) mapaEventos[ev.AlumnoID] = {};
-              mapaEventos[ev.AlumnoID][ev.TipoEvento] = true;
+            // FIX: BLOQUEO DE VIAJES HEREDADOS
+            // Aseguramos que si el historial tiene un viaje, se bloquee el botón
+            setViajesRealizados({
+              Ida: (historial || []).some(v => v.Sentido === 'Ida'),
+              Vuelta: (historial || []).some(v => v.Sentido === 'Vuelta')
             });
-            setEventosRegistrados(mapaEventos);
           }
         }
-      } catch (error) { console.error(error); }
-    };
-    
-    cargarTodo();
-  }, []);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (viajeActivo) {
-        e.preventDefault();
-        e.returnValue = ''; 
+      } catch (error) {
+        console.error("Error en carga:", error);
       }
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [viajeActivo]);
+    cargarDatosIniciales();
+  }, [user, idUsuario, idConductorReal]); // <-- Agrega idConductorReal a las dependencias
 
-  const handleAbrirTurno = async () => {
-    setProcesando(true);
-    try {
-      const res = await abrirTurno(conductorIdTemporal, rutaSeleccionada);
-      setTurnoActivo(res.data.data);
-      setViajesRealizados({ Ida: false, Vuelta: false });
-      mostrarToast('Turno abierto. Tu jornada ha comenzado.', 'success');
-    } catch (error) { 
-      mostrarToast(error.response?.data?.mensaje || 'Error al abrir el turno', 'error'); 
-    } finally {
-      setProcesando(false);
+ const handleAbrirTurno = async () => {
+  if (!rutaSeleccionada) return mostrarToast("Selecciona una ruta primero", "error");
+
+  setProcesando(true);
+  try {
+    // Para el admin: obtener el ConductorID de la ruta seleccionada
+    // Para el conductor: usar su propio conductorId del token
+    let conductorIdParaUsar;
+
+    if (esAdmin) {
+      const rutaInfo = rutas.find(r => Number(r.RutaID) === Number(rutaSeleccionada));
+      if (!rutaInfo?.ConductorID) {
+        mostrarToast("La ruta seleccionada no tiene conductor asignado", "error");
+        setProcesando(false);
+        return;
+      }
+      conductorIdParaUsar = rutaInfo.ConductorID;
+    } else {
+      conductorIdParaUsar = idConductorReal;
+      if (!conductorIdParaUsar) {
+        mostrarToast("No tienes perfil de conductor asociado", "error");
+        setProcesando(false);
+        return;
+      }
     }
-  };
+
+    const res = await abrirTurno(conductorIdParaUsar, rutaSeleccionada);
+    setTurnoActivo(res.data.data);
+    mostrarToast("Turno iniciado exitosamente", "success");
+  } catch (error) {
+    mostrarToast(error.response?.data?.mensaje || "Error al abrir turno", "error");
+  } finally {
+    setProcesando(false);
+  }
+};
 
   const handleIniciarViaje = async (sentido) => {
+    if (!navigator.geolocation) return mostrarToast("GPS no disponible", "error");
+
     setProcesando(true);
-    try {
-      const res = await iniciarViaje(turnoActivo.TurnoConductorID, rutaSeleccionada, sentido);
-      setViajeActivo(res.data.data.viaje);
-      setAlumnos(res.data.data.alumnos);
-      setEventosRegistrados({}); 
-      mostrarToast(`Viaje de ${sentido} en curso.`, 'success');
-    } catch (error) { 
-      mostrarToast('Error al iniciar el viaje', 'error'); 
-    } finally {
-      setProcesando(false);
-    }
-  };
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        const res = await iniciarViaje(turnoActivo.TurnoConductorID, turnoActivo.RutaID, sentido);
+        const resMapa = await getRutaOptimizada(turnoActivo.RutaID, latitude, longitude, sentido);
 
-  const handleMarcarAsistencia = async (alumno, tipoEvento) => {
-    if (procesando) return; 
-    setProcesando(true);
-    
-    const rutaData = rutas.find(r => r.RutaID === parseInt(rutaSeleccionada));
-    const datosEvento = {
-      AlumnoID: alumno.AlumnoID, ConductorID: conductorIdTemporal, 
-      RutaID: rutaData.RutaID, Sentido: viajeActivo.Sentido,
-      TipoEvento: tipoEvento, Turno: rutaData.Turno, Observaciones: ''
-    };
-
-    try {
-      await registrarEvento(datosEvento);
-      setEventosRegistrados(prev => {
-        const eventosActuales = prev[alumno.AlumnoID] || {};
-        return { ...prev, [alumno.AlumnoID]: { ...eventosActuales, [tipoEvento]: true } };
-      });
-      mostrarToast(`${alumno.NombreCompleto}: ${tipoEvento}`, 'success');
-    } catch (error) { 
-      mostrarToast(error.response?.data?.mensaje || 'Error en validación', 'error'); 
-    } finally {
-      setProcesando(false);
-    }
-  };
-
-  const handleDeshacer = async (alumno) => {
-    if (procesando) return;
-    setProcesando(true);
-    
-    const ev = eventosRegistrados[alumno.AlumnoID] || {};
-    let ultimoEvento = null;
-    
-    if (ev['Bajó']) ultimoEvento = 'Bajó';
-    else if (ev['Abordó']) ultimoEvento = 'Abordó';
-    else if (ev['Ausente']) ultimoEvento = 'Ausente';
-    else if (ev['AvisóAusencia']) ultimoEvento = 'AvisóAusencia';
-
-    if (!ultimoEvento) {
-      setProcesando(false);
-      return;
-    }
-
-    const rutaData = rutas.find(r => r.RutaID === parseInt(rutaSeleccionada));
-    const datos = {
-      alumnoId: alumno.AlumnoID, rutaId: rutaData.RutaID, 
-      sentido: viajeActivo.Sentido, tipoEvento: ultimoEvento
-    };
-
-    try {
-      await deshacerEvento(datos);
-      setEventosRegistrados(prev => {
-        const copia = { ...prev };
-        delete copia[alumno.AlumnoID][ultimoEvento];
-        return copia;
-      });
-      mostrarToast(`Acción "${ultimoEvento}" anulada correctamente`, 'success');
-    } catch (error) { 
-      mostrarToast('Error al deshacer acción', 'error'); 
-    } finally {
-      setProcesando(false);
-    }
-  };
-
-  const validarYFinalizarViaje = () => {
-    const alumnosIncompletos = alumnos.filter(a => {
-      const ev = eventosRegistrados[a.AlumnoID] || {};
-      const falto = ev['Ausente'] || ev['AvisóAusencia'];
-      const completo = ev['Abordó'] && ev['Bajó'];
-      return !(falto || completo); 
-    });
-    
-    if (alumnosIncompletos.length > 0) {
-      mostrarToast(`⚠️ Faltan ${alumnosIncompletos.length} alumnos por completar su ciclo.`, 'error');
-      return;
-    }
-
-    setModalAbierto({
-      mostrar: true, 
-      titulo: `¿Finalizar Viaje de ${viajeActivo.Sentido}?`,
-      mensaje: 'La cadena de custodia está completa. ¿Deseas cerrar la bitácora de este recorrido?',
-      colorBoton: '#dc2626',
-      accion: async () => {
-        if (procesando) return;
-        setProcesando(true);
-        try {
-          await finalizarViaje(viajeActivo.ViajeID);
-          setViajesRealizados(prev => ({ ...prev, [viajeActivo.Sentido]: true }));
-          setViajeActivo(null);
-          setAlumnos([]);
-          setModalAbierto({ mostrar: false });
-          mostrarToast('Viaje finalizado exitosamente', 'success');
-        } catch (error) { 
-          mostrarToast('Error al finalizar el viaje', 'error'); 
-        } finally {
-          setProcesando(false);
-        }
+        setViajeActivo(res.data.data.viaje);
+        setAlumnos(res.data.data.alumnos || []);
+        setDatosMapa(resMapa.data.data);
+        setEventosRegistrados({});
+        setModalAbierto({ mostrar: false });
+        mostrarToast(`Viaje de ${sentido} iniciado`, 'success');
+      } catch (error) {
+        mostrarToast("Error al conectar con el servidor", 'error');
+      } finally {
+        setProcesando(false);
       }
+    }, () => {
+      setProcesando(false);
+      mostrarToast("Activa el GPS para iniciar el viaje", "error");
     });
   };
 
-  const handleCerrarTurno = () => {
-    setModalAbierto({
-      mostrar: true, 
-      titulo: '¿Cerrar Turno del Día?',
-      mensaje: 'Esto indicará que tu jornada en esta ruta ha terminado por hoy.',
-      colorBoton: '#0f172a',
-      accion: async () => {
-        if (procesando) return;
-        setProcesando(true);
-        try {
-          await cerrarTurno(turnoActivo.TurnoConductorID);
-          setTurnoActivo(null);
-          setRutaSeleccionada('');
-          setModalAbierto({ mostrar: false });
-          mostrarToast('Jornada finalizada correctamente', 'success');
-        } catch (error) { 
-          mostrarToast(error.response?.data?.mensaje || 'Error al cerrar turno', 'error'); 
-        } finally {
-          setProcesando(false);
-        }
-      }
-    });
+  const handleRegistrarEvento = async (alumnoId, tipo) => {
+    if (esAdmin) return mostrarToast("Solo los conductores pueden registrar asistencia", "error");
+
+    try {
+      const rutaActual = rutas.find(r => r.RutaID === turnoActivo.RutaID);
+      const turnoRuta = rutaActual ? rutaActual.Turno : 'Mañana';
+
+      const datos = {
+        ViajeID: viajeActivo.ViajeID,
+        AlumnoID: alumnoId, 
+        TipoEvento: tipo,
+        ConductorID: idConductorReal,
+        RutaID: turnoActivo.RutaID,
+        Sentido: viajeActivo.Sentido,
+        Turno: turnoRuta 
+      };
+      
+      await registrarEvento(datos);
+      
+      // Actualiza el estado en UI para avanzar al siguiente paso del flujo
+      setEventosRegistrados(prev => ({ ...prev, [alumnoId]: tipo }));
+    } catch (error) {
+      mostrarToast(error.response?.data?.mensaje || "Error al registrar asistencia", 'error');
+    }
   };
+
+  const handleDeshacerEvento = async (alumnoId) => {
+    if (esAdmin) return mostrarToast("Modo solo lectura para administradores", "error");
+
+    try {
+      const tipoActual = eventosRegistrados[alumnoId];
+      await deshacerEvento({ 
+        alumnoId: alumnoId, 
+        rutaId: turnoActivo.RutaID, 
+        sentido: viajeActivo.Sentido, 
+        tipoEvento: tipoActual 
+      });
+      const newEventos = { ...eventosRegistrados };
+      delete newEventos[alumnoId];
+      setEventosRegistrados(newEventos);
+    } catch (error) {
+      mostrarToast("No se pudo deshacer el cambio", 'error');
+    }
+  };
+
+  const handleFinalizarViaje = async () => {
+    setProcesando(true);
+    try {
+      await finalizarViaje(viajeActivo.ViajeID);
+      setViajesRealizados(prev => ({ ...prev, [viajeActivo.Sentido]: true }));
+      setViajeActivo(null);
+      setAlumnos([]);
+      setDatosMapa({ polilinea: [], paradas: [] });
+      setModalAbierto({ mostrar: false });
+      mostrarToast("Trayecto finalizado", 'success');
+    } catch (error) {
+      mostrarToast("Error al finalizar", 'error');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const handleCerrarTurno = async () => {
+    setProcesando(true);
+    try {
+      await cerrarTurno(turnoActivo.TurnoConductorID);
+      setTurnoActivo(null);
+      setRutaSeleccionada('');
+      setViajesRealizados({ Ida: false, Vuelta: false });
+      setModalAbierto({ mostrar: false });
+      mostrarToast("Jornada terminada", "success");
+    } catch (error) {
+      mostrarToast(error.response?.data?.mensaje || "Error", "error");
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const btnOutlineStyle = (disabled) => ({
+    padding: '6px 12px',
+    background: 'white',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    fontWeight: '600',
+    fontSize: '13px',
+    color: '#334155',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
+    transition: 'all 0.2s'
+  });
+
+  const rutaInfo = rutas.find(r => r.RutaID === turnoActivo?.RutaID);
 
   return (
-    <div style={{ padding: '24px', width: '100%' }}>
-      {/* --- INYECCIÓN DE CSS PARA HOVERS --- */}
-      <style>{`
-        .action-btn { transition: all 0.2s ease-in-out; }
-        .btn-subir:not(:disabled):hover { background-color: #d1fae5 !important; border-color: #10b981 !important; color: #059669 !important; }
-        .btn-bajar:not(:disabled):hover { background-color: #dbeafe !important; border-color: #3b82f6 !important; color: #2563eb !important; }
-        .btn-ausente:not(:disabled):hover { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #dc2626 !important; }
-        .btn-aviso:not(:disabled):hover { background-color: #fef3c7 !important; border-color: #f59e0b !important; color: #d97706 !important; }
-        .btn-deshacer { transition: all 0.2s ease; border: 2px solid #94a3b8 !important; color: #334155 !important; background-color: white !important; }
-        .btn-deshacer:not(:disabled):hover { background-color: #e2e8f0 !important; border-color: #64748b !important; color: #0f172a !important; }
-      `}</style>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Bus color="var(--primary)" size={32} /> Panel de Operaciones
+          <h1 style={{ fontSize: '2.2rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+             <Bus color="var(--primary)" size={32} /> Panel de Operaciones
           </h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontWeight: '500' }}>
-            {turnoActivo ? `Turno Abierto - Ruta: ${rutas.find(r => r.RutaID === parseInt(turnoActivo.RutaID))?.NombreRuta}` : 'Selecciona una ruta para iniciar tu jornada'}
+          <p style={{ color: 'var(--text-muted)', fontSize: '1rem', marginTop: '4px' }}>
+            {turnoActivo ? `Turno Abierto - Ruta: ${rutaInfo?.NombreRuta || ''} - ${rutaInfo?.Turno || ''}` : `Hola, ${user?.nombre}. Selecciona una ruta para iniciar.`}
           </p>
         </div>
-      </div>
-
-      <div style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '24px', border: turnoActivo ? '2px solid var(--primary)' : '1px solid var(--border)' }}>
-        
-        {!turnoActivo && (
-          <div>
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px', borderLeft: '4px solid var(--primary)', color: 'var(--text-muted)', fontSize: '14px' }}>
-              <Clock size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }} />
-              No tienes ningún turno pendiente. Puedes abrir uno nuevo seleccionando la ruta.
-            </div>
-
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', color: '#0f172a' }}>1. Selecciona tu Ruta de hoy:</label>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <select className="form-input" value={rutaSeleccionada} onChange={(e) => setRutaSeleccionada(e.target.value)} disabled={procesando} style={{ flex: 1, margin: 0 }}>
-                <option value="">-- Elige una ruta --</option>
-                {rutas.map(r => <option key={r.RutaID} value={r.RutaID}>{r.NombreRuta} ({r.Turno})</option>)}
-              </select>
-              <button onClick={handleAbrirTurno} disabled={!rutaSeleccionada || procesando} style={{ background: 'var(--primary)', color: 'white', padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: '800', border: 'none', cursor: (!rutaSeleccionada || procesando) ? 'not-allowed' : 'pointer', display: 'flex', gap: '8px', alignItems: 'center', opacity: (!rutaSeleccionada || procesando) ? 0.5 : 1 }}>
-                <Power size={20} /> Abrir Turno
-              </button>
-            </div>
-          </div>
-        )}
-
         {turnoActivo && !viajeActivo && (
-          <div>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-              <button type="button" onClick={() => handleIniciarViaje('Ida')} disabled={viajesRealizados.Ida || procesando} style={{ flex: 1, background: viajesRealizados.Ida ? '#f1f5f9' : '#e0f2fe', color: viajesRealizados.Ida ? '#94a3b8' : '#0284c7', padding: '16px', borderRadius: '12px', border: viajesRealizados.Ida ? '1px solid #e2e8f0' : '2px solid #bae6fd', fontWeight: '800', cursor: (viajesRealizados.Ida || procesando) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: procesando ? 0.7 : 1 }}>
-                <Sunrise size={28} /> {viajesRealizados.Ida ? 'Viaje Ida (Finalizado)' : 'Iniciar Viaje IDA'}
-              </button>
-              <button type="button" onClick={() => handleIniciarViaje('Vuelta')} disabled={viajesRealizados.Vuelta || procesando} style={{ flex: 1, background: viajesRealizados.Vuelta ? '#f1f5f9' : '#fef08a', color: viajesRealizados.Vuelta ? '#94a3b8' : '#a16207', padding: '16px', borderRadius: '12px', border: viajesRealizados.Vuelta ? '1px solid #e2e8f0' : '2px solid #fde047', fontWeight: '800', cursor: (viajesRealizados.Vuelta || procesando) ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: procesando ? 0.7 : 1 }}>
-                <Sunset size={28} /> {viajesRealizados.Vuelta ? 'Viaje Vuelta (Finalizado)' : 'Iniciar Viaje VUELTA'}
-              </button>
-            </div>
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', textAlign: 'right' }}>
-              <button type="button" onClick={handleCerrarTurno} disabled={procesando} style={{ background: '#0f172a', color: 'white', padding: '10px 24px', borderRadius: '8px', fontWeight: '700', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', opacity: procesando ? 0.7 : 1 }}>
-                Terminar Jornada y Cerrar Turno
-              </button>
-            </div>
-          </div>
-        )}
-
-        {viajeActivo && (
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div><div style={{ display: 'inline-block', background: '#d1fae5', color: '#059669', padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: '800' }}>🟢 VIAJE DE {viajeActivo.Sentido.toUpperCase()} EN CURSO</div></div>
-            <button type="button" onClick={validarYFinalizarViaje} disabled={procesando} style={{ background: '#dc2626', color: 'white', padding: '12px 24px', borderRadius: '10px', fontWeight: '800', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', display: 'flex', gap: '8px', alignItems: 'center', opacity: procesando ? 0.7 : 1 }}>
-              <Square size={20} /> Finalizar Viaje
-            </button>
-          </div>
+          <button 
+            onClick={() => setModalAbierto({ mostrar: true, titulo: '¿Cerrar Turno?', mensaje: 'Confirmas que has terminado todos los viajes del día.', colorBoton: 'var(--danger)', accion: handleCerrarTurno })}
+            style={{ background: 'transparent', color: '#dc2626', border: '1px solid #fecaca', display: 'flex', gap: '8px', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            <Power size={18}/> Cerrar Turno
+          </button>
         )}
       </div>
 
       {viajeActivo && (
-        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden', flex: 1 }}>
-          <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid var(--border)', fontWeight: '700', color: '#0f172a' }}>Lista de Pasajeros</div>
-          <div style={{ padding: '12px' }}>
-            {alumnos.map(alumno => {
-                const ev = eventosRegistrados[alumno.AlumnoID] || {};
-                const estaInactivo = ev['Ausente'] || ev['AvisóAusencia'];
-                const subio = ev['Abordó'];
-                const bajo = ev['Bajó'];
-                const tieneEstado = subio || bajo || estaInactivo;
+        <div style={{ border: '1px solid var(--primary)', borderRadius: '12px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', background: 'white' }}>
+          <span style={{ background: '#d1fae5', color: '#059669', padding: '6px 12px', borderRadius: '20px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '8px', height: '8px', background: '#059669', borderRadius: '50%', display: 'inline-block' }}></span>
+              Viaje de {viajeActivo.Sentido} en curso
+          </span>
+          <button 
+            onClick={() => setModalAbierto({ mostrar: true, titulo: '¿Finalizar Viaje?', mensaje: 'Confirmas que has llegado al destino y finalizado el trayecto.', colorBoton: '#dc2626', accion: handleFinalizarViaje })}
+            style={{ background: '#dc2626', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Square size={16} /> Finalizar Viaje
+          </button>
+        </div>
+      )}
 
-                return (
-                  <div key={alumno.AlumnoID} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '12px' }}>
+      {viajeActivo && datosMapa.polilinea && datosMapa.polilinea.length > 0 && (
+        <div style={{ marginBottom: '30px' }}>
+          <MapaRuta polilinea={datosMapa.polilinea} paradas={datosMapa.paradas} />
+        </div>
+      )}
+
+      {!turnoActivo && (
+        <div className="table-card" style={{ padding: '80px 40px', textAlign: 'center', borderRadius: '30px' }}>
+          <div style={{ background: '#f0f7ff', width: '90px', height: '90px', borderRadius: '25px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <Bus size={45} color="var(--primary)" />
+          </div>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '12px' }}>Iniciar Jornada de Transporte</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '40px', maxWidth: '500px', margin: '0 auto 40px' }}>
+            Al abrir el turno, el sistema notificará a los padres que el bus está listo para iniciar las rutas.
+          </p>
+          <div style={{ maxWidth: '450px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <select className="form-input" value={rutaSeleccionada} onChange={(e) => setRutaSeleccionada(e.target.value)} style={{ textAlign: 'center', fontWeight: '600', fontSize: '1rem', height: '55px' }}>
+              <option value="">-- Elige la Ruta Asignada --</option>
+              {rutas.map(r => <option key={r.RutaID} value={r.RutaID}>{r.NombreRuta} ({r.Turno})</option>)}
+            </select>
+            <button onClick={handleAbrirTurno} disabled={procesando || !rutaSeleccionada}
+              className="btn-primary"
+              style={{
+                width: '100%', padding: '18px', borderRadius: '15px',
+                fontWeight: '700', fontSize: '1.1rem',
+                justifyContent: 'center'   // ← centra el contenido del flex
+              }}>
+              {procesando ? 'Procesando...' : '🚌 Iniciar Turno'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {turnoActivo && !viajeActivo && (
+        <div className="two-col-grid" style={{ gap: '30px' }}>
+          <div className="table-card" style={{ padding: '40px', borderRadius: '25px', opacity: viajesRealizados.Ida ? 0.5 : 1, transition: 'all 0.3s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <Sunrise size={50} color="#f59e0b" />
+              {viajesRealizados.Ida && <div style={{ background: '#d1fae5', color: '#059669', padding: '5px 15px', borderRadius: '20px', fontWeight: '800', fontSize: '12px' }}>COMPLETADO</div>}
+            </div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '10px' }}>Viaje de Ida</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Trayecto desde las casas hacia el colegio.</p>
+            <button disabled={viajesRealizados.Ida || procesando} onClick={() => setModalAbierto({ mostrar: true, titulo: '¿Iniciar Viaje de Ida?', mensaje: 'Se notificará a los padres que el bus va en camino a las casas.', colorBoton: '#f59e0b', accion: () => handleIniciarViaje('Ida') })} style={{ width: '100%', padding: '15px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>
+              {viajesRealizados.Ida ? 'Finalizado' : 'Comenzar Recorrido'}
+            </button>
+          </div>
+
+          <div className="table-card" style={{ padding: '40px', borderRadius: '25px', opacity: viajesRealizados.Vuelta ? 0.5 : 1, transition: 'all 0.3s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <Sunset size={50} color="#6366f1" />
+              {viajesRealizados.Vuelta && <div style={{ background: '#d1fae5', color: '#059669', padding: '5px 15px', borderRadius: '20px', fontWeight: '800', fontSize: '12px' }}>COMPLETADO</div>}
+            </div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '10px' }}>Viaje de Vuelta</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Trayecto desde el colegio de regreso a las casas.</p>
+            <button disabled={viajesRealizados.Vuelta || procesando} onClick={() => setModalAbierto({ mostrar: true, titulo: '¿Iniciar Viaje de Vuelta?', mensaje: 'Se notificará que los alumnos están saliendo del colegio.', colorBoton: '#6366f1', accion: () => handleIniciarViaje('Vuelta') })} style={{ width: '100%', padding: '15px', background: '#6366f1', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>
+              {viajesRealizados.Vuelta ? 'Finalizado' : 'Comenzar Recorrido'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {viajeActivo && (
+        <div style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', background: '#f8fafc', fontWeight: '700', color: '#0f172a' }}>
+            Lista de Pasajeros
+          </div>
+          
+          <div style={{ padding: '0 24px' }}>
+            {alumnos.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No hay alumnos para este viaje.</div>
+            ) : alumnos.map((alumno, index) => {
+              const evento = eventosRegistrados[alumno.AlumnoID];
+              const nombreMostrar = alumno.NombreCompleto || (alumno.Nombre ? `${alumno.Nombre} ${alumno.Apellido}` : 'Alumno Sin Nombre');
+              const isLast = index === alumnos.length - 1;
+
+              return (
+                <div key={alumno.AlumnoID} style={{ padding: '20px 0', borderBottom: isLast ? 'none' : '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  
+                  <div>
+                    <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '15px', marginBottom: '4px' }}>{nombreMostrar}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{alumno.Direccion}</div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     
-                    {/* INFO DEL ALUMNO */}
-                    <div>
-                      <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '15px', textDecoration: estaInactivo ? 'line-through' : 'none' }}>{alumno.NombreCompleto}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{alumno.Direccion}</div>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                      
-                      {/* BOTONES DE CUSTODIA */}
-                      <div style={{ display: 'flex', background: '#f8fafc', padding: '4px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                        <button 
-                          type="button"
-                          className="action-btn btn-subir"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarcarAsistencia(alumno, 'Abordó'); }} 
-                          disabled={subio || estaInactivo || procesando} 
-                          style={{ padding: '8px 16px', borderRadius: '8px', border: subio ? '1px solid #10b981' : '1px solid #e2e8f0', background: subio ? '#10b981' : 'white', color: subio ? 'white' : '#64748b', fontWeight: '700', cursor: (subio || estaInactivo || procesando) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
+                    {/* FASE 1: Pendiente (Sin registro) */}
+                    {!evento && (
+                      <>
+                        <button disabled={esAdmin} onClick={() => handleRegistrarEvento(alumno.AlumnoID, 'Abordó')} style={btnOutlineStyle(esAdmin)}>
                           <LogIn size={16} /> Subió
                         </button>
-                        
-                        <button 
-                          type="button"
-                          className="action-btn btn-bajar"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarcarAsistencia(alumno, 'Bajó'); }} 
-                          disabled={!subio || bajo || estaInactivo || procesando} 
-                          style={{ padding: '8px 16px', borderRadius: '8px', border: bajo ? '1px solid #3b82f6' : '1px solid #e2e8f0', background: bajo ? '#3b82f6' : 'white', color: bajo ? 'white' : '#64748b', fontWeight: '700', cursor: (!subio || bajo || estaInactivo || procesando) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
+                        <button disabled={esAdmin} onClick={() => handleRegistrarEvento(alumno.AlumnoID, 'Ausente')} style={{ ...btnOutlineStyle(esAdmin), padding: '8px' }} title="No se presentó">
+                          <X size={16} />
+                        </button>
+                        <button disabled={esAdmin} onClick={() => handleRegistrarEvento(alumno.AlumnoID, 'AvisóAusencia')} style={{ ...btnOutlineStyle(esAdmin), padding: '8px' }} title="Aviso de Padre">
+                          <MessageSquare size={16} />
+                        </button>
+                      </>
+                    )}
+
+                    {/* FASE 2: En Tránsito (Ya abordó, ahora puede bajar) */}
+                    {evento === 'Abordó' && (
+                      <>
+                        <span style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', background: '#d1fae5', color: '#059669' }}>
+                           ABORDÓ
+                        </span>
+                        <button disabled={esAdmin} onClick={() => handleRegistrarEvento(alumno.AlumnoID, 'Bajó')} style={{ ...btnOutlineStyle(esAdmin), background: '#e0f2fe', borderColor: '#bae6fd', color: '#0369a1' }}>
                           <LogOut size={16} /> Bajó
                         </button>
-                      </div>
+                        <button disabled={esAdmin} onClick={() => handleDeshacerEvento(alumno.AlumnoID)} style={{ ...btnOutlineStyle(esAdmin), padding: '6px 10px', background: '#f8fafc' }} title="Deshacer acción">
+                           <RotateCcw size={16} />
+                        </button>
+                      </>
+                    )}
 
-                      {/* BOTONES DE INASISTENCIA */}
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="button" className="action-btn btn-ausente" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarcarAsistencia(alumno, 'Ausente'); }} disabled={subio || estaInactivo || procesando} style={{ padding: '8px', borderRadius: '8px', border: ev['Ausente'] ? '1px solid #ef4444' : '1px solid #e2e8f0', background: ev['Ausente'] ? '#ef4444' : 'white', color: ev['Ausente'] ? 'white' : '#64748b', cursor: (subio || estaInactivo || procesando) ? 'not-allowed' : 'pointer' }} title="No se presentó"><XCircle size={20} /></button>
-                        <button type="button" className="action-btn btn-aviso" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarcarAsistencia(alumno, 'AvisóAusencia'); }} disabled={subio || estaInactivo || procesando} style={{ padding: '8px', borderRadius: '8px', border: ev['AvisóAusencia'] ? '1px solid #f59e0b' : '1px solid #e2e8f0', background: ev['AvisóAusencia'] ? '#f59e0b' : 'white', color: ev['AvisóAusencia'] ? 'white' : '#64748b', cursor: (subio || estaInactivo || procesando) ? 'not-allowed' : 'pointer' }} title="Padre avisó ausencia"><MessageSquare size={20} /></button>
-                      </div>
+                    {/* FASE 3: Finalizado (Bajó o Ausente) */}
+                    {(evento === 'Bajó' || evento === 'Ausente' || evento === 'AvisóAusencia') && (
+                      <>
+                        <span style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', background: evento === 'Bajó' ? '#e0f2fe' : '#fee2e2', color: evento === 'Bajó' ? '#0369a1' : '#dc2626' }}>
+                           {evento === 'AvisóAusencia' ? 'AVISÓ PADRE' : evento}
+                        </span>
+                        <button disabled={esAdmin} onClick={() => handleDeshacerEvento(alumno.AlumnoID)} style={{ ...btnOutlineStyle(esAdmin), padding: '6px 10px', background: '#f8fafc' }} title="Deshacer acción">
+                           <RotateCcw size={16} />
+                        </button>
+                      </>
+                    )}
 
-                      {/* BOTÓN DESHACER (RESERVA DE ESPACIO PERFECTA) */}
-                      <button 
-                        type="button"
-                        className="action-btn btn-deshacer"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeshacer(alumno); }} 
-                        disabled={procesando || !tieneEstado}
-                        style={{ 
-                          visibility: tieneEstado ? 'visible' : 'hidden', /* Esto reserva el espacio exacto y evita brincos */
-                          padding: '8px', borderRadius: '50%', cursor: (procesando || !tieneEstado) ? 'not-allowed' : 'pointer', marginLeft: '8px' 
-                        }} 
-                        title="Deshacer última acción"
-                      >
-                        <RotateCcw size={18} />
-                      </button>
-                      
-                    </div>
                   </div>
-                )
+
+                </div>
+              );
             })}
           </div>
         </div>
       )}
 
       {modalAbierto.mostrar && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '16px', maxWidth: '450px', width: '90%', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <AlertCircle size={48} color={modalAbierto.colorBoton} style={{ marginBottom: '16px', display: 'inline-block' }} />
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '12px', color: '#0f172a' }}>{modalAbierto.titulo}</h2>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.5' }}>{modalAbierto.mensaje}</p>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
-                type="button" 
-                onClick={() => setModalAbierto({ mostrar: false })} 
-                disabled={procesando}
-                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#334155', borderRadius: '10px', border: 'none', fontWeight: '700', cursor: procesando ? 'not-allowed' : 'pointer', opacity: procesando ? 0.5 : 1 }}
-              >
-                Regresar
-              </button>
-              <button 
-                type="button" 
-                onClick={modalAbierto.accion} 
-                disabled={procesando}
-                style={{ flex: 1, padding: '12px', background: modalAbierto.colorBoton, color: 'white', borderRadius: '10px', border: 'none', fontWeight: '700', cursor: procesando ? 'not-allowed' : 'pointer', opacity: procesando ? 0.5 : 1 }}
-              >
-                {procesando ? 'Procesando...' : 'Confirmar'}
-              </button>
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ textAlign: 'center', padding: '40px' }}>
+            <AlertCircle size={60} color={modalAbierto.colorBoton} style={{ marginBottom: '20px' }} />
+            <h2 style={{ fontSize: '1.6rem', fontWeight: '800', marginBottom: '15px' }}>{modalAbierto.titulo}</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '35px', lineHeight: '1.6' }}>{modalAbierto.mensaje}</p>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <button onClick={() => setModalAbierto({ mostrar: false })} disabled={procesando} style={{ flex: 1, padding: '15px', background: '#f1f5f9', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={modalAbierto.accion} disabled={procesando} style={{ flex: 1, padding: '15px', background: modalAbierto.colorBoton, color: 'white', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer' }}>{procesando ? 'Procesando...' : 'Confirmar'}</button>
             </div>
           </div>
         </div>

@@ -1,130 +1,133 @@
 const authService = require('./auth.service');
 const jwt = require('jsonwebtoken');
 const sql = require('mssql');
-const bcryptjs = require('bcryptjs'); // Importación exacta de bcryptjs
+const bcryptjs = require('bcryptjs');
 const { poolPromise } = require('../../config/db');
 const { enviarCorreoRecuperacion } = require('../../utils/email.service');
 
-// Recibe la petición, llama al servicio y responde al cliente
+// Recibe credenciales, llama al service y responde
 const login = async (req, res) => {
   try {
     const { correo, password } = req.body;
-
     if (!correo || !password) {
       return res.status(400).json({ ok: false, data: null, mensaje: 'Faltan datos' });
     }
-
     const resultado = await authService.login(correo, password);
-
-    if (!resultado.ok) {
-      return res.status(401).json(resultado);
-    }
-
+    if (!resultado.ok) return res.status(401).json(resultado);
     return res.status(200).json(resultado);
   } catch (error) {
-    console.error(error);
+    console.error('Error en login:', error);
     return res.status(500).json({ ok: false, data: null, mensaje: 'Error en el servidor' });
   }
 };
 
-// Solicitar recuperación de contraseña
+// Genera token y manda el correo de recuperación
 const olvidePassword = async (req, res) => {
   try {
     const { correo } = req.body;
-
     if (!correo) {
-      return res.status(400).json({ ok: false, data: null, mensaje: 'El correo electrónico es requerido' });
+      return res.status(400).json({ ok: false, data: null, mensaje: 'El correo es requerido' });
     }
 
     const pool = await poolPromise;
-    
-    // Lectura de tabla usuarios para verificar si el correo existe y obtener su UsuarioID
     const result = await pool.request()
       .input('correo', sql.VarChar, correo)
-      .query('SELECT UsuarioID, CorreoElectronico FROM Usuarios WHERE CorreoElectronico = @correo');
+      .query('SELECT UsuarioID, CorreoElectronico FROM Usuarios WHERE CorreoElectronico = @correo AND Eliminado = 0');
 
-    if (result.recordset.length === 0) {
-      return res.status(200).json({ 
-        ok: true, 
-        data: null, 
-        mensaje: 'Si el correo existe en nuestro sistema, recibirás un enlace de recuperación pronto.' 
-      });
-    }
+    // Siempre respondemos igual para no revelar si el correo existe
+    const respuestaGenerica = {
+      ok: true,
+      data: null,
+      mensaje: 'Si el correo existe en nuestro sistema, recibirás un enlace de recuperación pronto.'
+    };
+
+    if (result.recordset.length === 0) return res.status(200).json(respuestaGenerica);
 
     const usuario = result.recordset[0];
-
-    // Usamos UsuarioID para el token
     const resetToken = jwt.sign(
       { UsuarioID: usuario.UsuarioID },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
 
-    // Usamos CorreoElectronico para saber a dónde mandarlo
     await enviarCorreoRecuperacion(usuario.CorreoElectronico, resetToken);
-
-    return res.status(200).json({ 
-      ok: true, 
-      data: null, 
-      mensaje: 'Si el correo existe en nuestro sistema, recibirás un enlace de recuperación pronto.' 
-    });
+    return res.status(200).json(respuestaGenerica);
 
   } catch (error) {
     console.error('Error en olvidePassword:', error);
-    return res.status(500).json({ ok: false, data: null, mensaje: 'Error en el servidor al procesar la solicitud' });
+    return res.status(500).json({ ok: false, data: null, mensaje: 'Error al procesar la solicitud' });
   }
 };
 
-// Restablecer la contraseña usando el Token
+// Valida el token, verifica historial y actualiza la contraseña
 const resetPassword = async (req, res) => {
   try {
     const { token, nuevaPassword } = req.body;
-
     if (!token || !nuevaPassword) {
-      return res.status(400).json({ ok: false, data: null, mensaje: 'El token y la nueva contraseña son requeridos' });
+      return res.status(400).json({ ok: false, data: null, mensaje: 'Token y nueva contraseña son requeridos' });
     }
 
-    // 1. Verificar la validez del Token
+    // 1. Verificar que el token sea válido y no haya expirado
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
-      return res.status(401).json({ 
-        ok: false, 
-        data: null, 
-        mensaje: 'El enlace de recuperación es inválido o ha expirado. Por favor, solicita uno nuevo.' 
+      return res.status(401).json({
+        ok: false,
+        data: null,
+        mensaje: 'El enlace de recuperación es inválido o ha expirado. Solicita uno nuevo.'
       });
     }
 
     const usuarioID = decoded.UsuarioID;
-
-    // 2. Encriptar la nueva contraseña con bcryptjs
-    const salt = await bcryptjs.genSalt(10);
-    const passwordHashEncriptada = await bcryptjs.hash(nuevaPassword, salt);
-
     const pool = await poolPromise;
-    
-    // 3. Actualizar la contraseña en la base de datos
-    const result = await pool.request()
-      .input('PasswordHash', sql.VarChar, passwordHashEncriptada)
-      .input('UsuarioID', sql.Int, usuarioID)
-      .query('UPDATE Usuarios SET PasswordHash = @PasswordHash WHERE UsuarioID = @UsuarioID');
 
-    if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({ ok: false, data: null, mensaje: 'Usuario no encontrado en el sistema.' });
+    // 2. Verificar que la nueva contraseña no sea igual a las últimas 3
+    const historial = await pool.request()
+      .input('uId', sql.Int, usuarioID)
+      .query(`
+        SELECT TOP 3 PasswordHash 
+        FROM HistorialContrasenas 
+        WHERE UsuarioID = @uId 
+        ORDER BY FechaCambio DESC
+      `);
+
+    for (const registro of historial.recordset) {
+      const esIgual = await bcryptjs.compare(nuevaPassword, registro.PasswordHash);
+      if (esIgual) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          mensaje: 'No puedes usar una de tus últimas 3 contraseñas. Elige una diferente.'
+        });
+      }
     }
 
-    return res.status(200).json({ 
-      ok: true, 
-      data: null, 
-      mensaje: 'Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión.' 
+    // 3. Encriptar y guardar la nueva contraseña
+    const salt = await bcryptjs.genSalt(10);
+    const nuevoHash = await bcryptjs.hash(nuevaPassword, salt);
+
+    await pool.request()
+      .input('hash', sql.VarChar, nuevoHash)
+      .input('uId', sql.Int, usuarioID)
+      .query('UPDATE Usuarios SET PasswordHash = @hash WHERE UsuarioID = @uId');
+
+    // 4. Guardar en el historial para futuras validaciones
+    await pool.request()
+      .input('uId', sql.Int, usuarioID)
+      .input('hash', sql.VarChar, nuevoHash)
+      .query('INSERT INTO HistorialContrasenas (UsuarioID, PasswordHash) VALUES (@uId, @hash)');
+
+    return res.status(200).json({
+      ok: true,
+      data: null,
+      mensaje: 'Tu contraseña fue actualizada exitosamente. Ya puedes iniciar sesión.'
     });
 
   } catch (error) {
     console.error('Error en resetPassword:', error);
-    return res.status(500).json({ ok: false, data: null, mensaje: 'Error en el servidor al procesar la solicitud' });
+    return res.status(500).json({ ok: false, data: null, mensaje: 'Error al procesar la solicitud' });
   }
 };
 
-// Exportamos todas las funciones
 module.exports = { login, olvidePassword, resetPassword };

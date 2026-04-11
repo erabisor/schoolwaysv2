@@ -87,9 +87,6 @@ const crear = async (datos) => {
 const actualizar = async (id, datos) => {
   const pool = await poolPromise;
   
-  console.log(`--- EDITANDO ALUMNO ID: ${id} ---`);
-  console.log(`Datos recibidos:`, datos);
-
   const nombreCompleto = datos.NombreCompleto ? datos.NombreCompleto.trim() : "";
   const primeraEspacio = nombreCompleto.indexOf(' ');
   const nombre = primeraEspacio !== -1 ? nombreCompleto.substring(0, primeraEspacio) : nombreCompleto;
@@ -103,7 +100,6 @@ const actualizar = async (id, datos) => {
   if (checkPadre.recordset.length > 0) {
     padreIdFinal = checkPadre.recordset[0].PadreID;
   } else {
-    console.log(`Padre no encontrado en tabla Padres para UsuarioID: ${datos.UsuarioID}. Creando...`);
     const nuevoPadre = await pool.request()
       .input('uId', sql.Int, datos.UsuarioID)
       .query('INSERT INTO Padres (UsuarioID) OUTPUT INSERTED.PadreID VALUES (@uId)');
@@ -135,8 +131,6 @@ const actualizar = async (id, datos) => {
     .input('tipo', sql.VarChar, datos.TipoServicio) // <--- NUEVO
     .query(query);
 
-  console.log(`Filas afectadas: ${result.rowsAffected}`);
-  console.log(`--- FIN EDICIÓN ---`);
 };
 
 const cambiarEstado = async (id, estado) => {

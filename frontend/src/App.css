@@ -1,19 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+/* ============================================================
+   VARIABLES GLOBALES
+   ============================================================ */
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1e40af;
-  --bg-light: #f8fafc;
-  --white: #ffffff;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --success: #10b981;
-  --danger: #ef4444;
-  --warning: #f59e0b;
+  --primary:       #2563eb;
+  --primary-dark:  #1e40af;
+  --bg-light:      #f8fafc;
+  --white:         #ffffff;
+  --text-muted:    #64748b;
+  --border:        #e2e8f0;
+  --success:       #10b981;
+  --danger:        #ef4444;
+  --warning:       #f59e0b;
   --sidebar-width: 260px;
+
+  /* Espaciado responsive */
+  --page-padding:  40px;
+  --card-padding:  24px;
+  --gap:           20px;
 }
 
-* {
+/* Móvil */
+@media (max-width: 768px) {
+  :root {
+    --page-padding: 16px;
+    --card-padding: 16px;
+    --gap:          12px;
+  }
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -23,97 +43,532 @@
 body {
   background-color: var(--bg-light);
   color: #0f172a;
+  min-height: 100vh;
 }
 
+/* ============================================================
+   LAYOUT PRINCIPAL
+   ============================================================ */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+.content-area {
+  flex: 1;
+  padding: var(--page-padding);
+  overflow-y: auto;
+  min-width: 0; /* evita overflow en flex */
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.sidebar-nav {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--primary);
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+  z-index: 200;
+}
+
+/* En móvil el sidebar flota sobre el contenido */
+@media (max-width: 768px) {
+  .sidebar-nav {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+  }
+
+  .sidebar-nav.abierto {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+  }
+
+  /* Overlay oscuro detrás del sidebar en móvil */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 199;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+}
+
+/* Botón hamburguesa legacy — mantenido por compatibilidad */
+.btn-hamburguesa { display: none; }
+
+/* ============================================================
+   BARRA SUPERIOR MÓVIL
+   ============================================================ */
+.mobile-topbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--primary);
+    color: white;
+    padding: 0 16px;
+    z-index: 300;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .mobile-topbar-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+
+  .mobile-topbar-btn:hover {
+    background: rgba(255,255,255,0.25);
+  }
+
+  .mobile-topbar-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+
+  /* Espacio para que el contenido no quede debajo de la topbar */
+  .content-area { padding-top: calc(56px + var(--page-padding)); }
+}
+
+/* ============================================================
+   NAVEGACIÓN DEL SIDEBAR
+   ============================================================ */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  color: #bfdbfe;
+  background-color: transparent;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  background-color: rgba(255,255,255,0.15);
+  color: white;
+  transform: translateX(4px);
+}
+
+.nav-item.active {
+  background-color: white;
+  color: var(--primary);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  transform: translateX(0);
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background-color: transparent;
+  color: #fca5a5;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.logout-btn:hover {
+  background-color: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+/* ============================================================
+   FORMULARIOS
+   ============================================================ */
 .form-input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1.5px solid var(--border);
   border-radius: 12px;
   font-family: 'Inter', sans-serif;
-  margin-bottom: 16px;
+  font-size: 14px;
+  margin-bottom: 14px;
   outline: none;
   transition: all 0.2s;
+  background: white;
 }
 
 .form-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 
-/* EFECTOS DEL SIDEBAR */
-.nav-item {
-  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
-  border-radius: 14px; text-decoration: none; font-weight: 600;
-  color: #bfdbfe; background-color: transparent;
-  transition: all 0.2s ease; margin-bottom: 8px;
-}
-.nav-item:hover {
-  background-color: rgba(255,255,255,0.15); color: white; transform: translateX(8px);
-}
-.nav-item.active {
-  background-color: white; color: var(--primary); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-  transform: translateX(0); /* Evita que el activo se mueva en hover */
+/* ============================================================
+   TABLAS RESPONSIVE
+   ============================================================ */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 16px 16px 0 0;
 }
 
-.logout-btn {
-  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
-  border-radius: 14px; border: 1px solid rgba(255,255,255,0.2);
-  background-color: transparent; color: #fca5a5; font-weight: 600;
-  cursor: pointer; transition: all 0.2s; width: 100%;
-}
-.logout-btn:hover {
-  background-color: #ef4444; color: white; border-color: #ef4444;
+.table-wrapper table {
+  min-width: 600px; /* fuerza scroll horizontal en móvil */
 }
 
-/* COMPONENTES GLOBALES (TOAST Y MODAL) */
+/* ============================================================
+   GRIDS RESPONSIVE
+   ============================================================ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--gap);
+  margin-bottom: 24px;
+}
+
+.two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
+@media (max-width: 900px) {
+  .two-col-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   HEADERS DE PÁGINA
+   ============================================================ */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-header h1 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   TARJETAS / CARDS
+   ============================================================ */
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: var(--card-padding);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+/* ============================================================
+   MODALES
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 16px; /* evita que el modal toque los bordes en móvil */
+}
+
+.modal-content {
+  background-color: white;
+  padding: 28px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
 .toast-notification {
-  position: fixed; bottom: 24px; right: 24px; padding: 16px 24px;
-  border-radius: 12px; display: flex; align-items: center; gap: 12px;
-  color: white; font-weight: 600; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-  animation: slideInRight 0.4s ease-out forwards; z-index: 9999;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+  animation: slideInRight 0.4s ease-out forwards;
+  z-index: 9999;
+  max-width: calc(100vw - 32px); /* no se sale de pantalla en móvil */
 }
-.toast-notification.success { background-color: var(--success); border-left: 6px solid #047857; }
-.toast-notification.error { background-color: var(--danger); border-left: 6px solid #b91c1c; }
+
+.toast-notification.success {
+  background-color: var(--success);
+  border-left: 5px solid #047857;
+}
+
+.toast-notification.error {
+  background-color: var(--danger);
+  border-left: 5px solid #b91c1c;
+}
 
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
 
-.modal-overlay {
-  position: fixed; inset: 0; background-color: rgba(0,0,0,0.5);
-  display: flex; justify-content: center; align-items: center; z-index: 1000;
-}
-.modal-content {
-  background-color: white; padding: 32px; border-radius: 16px;
-  width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+/* ============================================================
+   SCROLLBAR PERSONALIZADO
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-light); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+.hidden-mobile  { display: block; }
+.visible-mobile { display: none;  }
+
+@media (max-width: 768px) {
+  .hidden-mobile  { display: none;  }
+  .visible-mobile { display: block; }
 }
 
-/* ==========================================================================
-   ESTILOS DEL SCROLLBAR (Personalizado para SchoolWaySV)
-   ========================================================================== */
-
-/* Ancho y alto de la barra */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ============================================================
+   LOGIN RESPONSIVE
+   ============================================================ */
+.login-container {
+  display: flex;
+  height: 100vh;
 }
 
-/* El fondo por donde se desliza la barra */
-::-webkit-scrollbar-track {
-  background: var(--bg-light); 
+.login-panel-left {
+  flex: 1;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.login-panel-right {
+  flex: 1;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+@media (max-width: 768px) {
+  .login-panel-left  { display: none; }
+  .login-panel-right { width: 100%; padding: 40px 24px; }
+}
+
+/* ============================================================
+   TABLE CARD (bloque blanco con sombra para tablas)
+   ============================================================ */
+.table-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+/* ============================================================
+   SEARCH BOX (caja de búsqueda con icono)
+   ============================================================ */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 8px 16px;
   border-radius: 10px;
+  border: 1.5px solid var(--border);
 }
 
-/* La barra deslizable en sí */
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* Gris azulado suave en estado normal */
+.search-input {
+  border: none;
+  outline: none;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  width: 180px;
+  min-width: 0;
+}
+
+/* ============================================================
+   FILTER BOX (caja de filtro con select)
+   ============================================================ */
+.filter-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 6px 16px;
   border-radius: 10px;
-  transition: background 0.3s ease;
+  border: 1.5px solid var(--border);
 }
 
-/* La barra deslizable al pasar el mouse */
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary); /* Azul principal de la marca */
+.filter-select {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+/* ============================================================
+   BOTONES DE ACCIÓN COMUNES
+   ============================================================ */
+.btn-secondary {
+  background: white;
+  color: #0f172a;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   BARRA DE ACCIONES MASIVAS
+   ============================================================ */
+.bulk-bar {
+  background: #e0f2fe;
+  padding: 16px 24px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border: 1px solid #bae6fd;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.bulk-bar-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   PAGE HEADER — RESPONSIVE
+   ============================================================ */
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ============================================================
+   LOGIN — control de visibilidad logo/firma por breakpoint
+   ============================================================ */
+
+/* En desktop: el logo del panel derecho se oculta (el izquierdo ya lo muestra) */
+.login-logo-movil  { display: none;  }
+.login-firma-movil { display: none;  }
+
+/* En móvil: el panel izquierdo desaparece, el logo y firma del panel derecho aparecen */
+@media (max-width: 768px) {
+  .login-logo-movil  { display: flex;  }
+  .login-firma-movil { display: block; }
 }

@@ -9,7 +9,7 @@ import Toast from '../../components/Toast';
 
 const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
-  const [filtroRol, setFiltroRol] = useState(''); 
+  const [filtroRol, setFiltroRol] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [usuarioAEditar, setUsuarioAEditar] = useState(null);
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
@@ -33,13 +33,13 @@ const Usuarios = () => {
   const mostrarToast = (mensaje, tipo) => setToast({ mensaje, tipo });
 
   const handleToggleEstado = async (id, nuevoEstado) => {
-    try { await toggleEstadoUsuario(id, nuevoEstado); cargarDatos(); } 
+    try { await toggleEstadoUsuario(id, nuevoEstado); cargarDatos(); }
     catch (error) { mostrarToast('Error', 'error'); }
   };
 
   const handleGuardarUsuario = async (datos) => {
     try {
-      if (usuarioAEditar) { await editarUsuario(usuarioAEditar.UsuarioID, datos); } 
+      if (usuarioAEditar) { await editarUsuario(usuarioAEditar.UsuarioID, datos); }
       else { await crearUsuario(datos); }
       setModalAbierto(false);
       cargarDatos();
@@ -48,7 +48,7 @@ const Usuarios = () => {
   };
 
   const confirmarYeliminar = async () => {
-    try { await eliminarUsuarioFisico(usuarioAEliminar.UsuarioID); setUsuarioAEliminar(null); cargarDatos(); } 
+    try { await eliminarUsuarioFisico(usuarioAEliminar.UsuarioID); setUsuarioAEliminar(null); cargarDatos(); }
     catch (error) { mostrarToast('Error', 'error'); }
   };
 
@@ -90,37 +90,41 @@ const Usuarios = () => {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#0f172a' }}>Usuarios</h1>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 16px', borderRadius: '10px', border: '1.5px solid var(--border)' }}>
+
+      <div className="page-header">
+        <h1>Usuarios</h1>
+        <div className="header-actions">
+          <div className="filter-box">
             <Filter size={18} color="var(--text-muted)" />
-            <select style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontWeight: '500', padding: '8px 0', cursor: 'pointer' }} value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
-              <option value="">Todos los roles</option><option value="Admin">Administrador</option><option value="Conductor">Conductor</option><option value="Padre">Padre</option><option value="Estudiante">Estudiante</option>
+            <select className="filter-select" value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
+              <option value="">Todos los roles</option>
+              <option value="Admin">Administrador</option>
+              <option value="Conductor">Conductor</option>
+              <option value="Padre">Padre</option>
+              <option value="Estudiante">Estudiante</option>
             </select>
           </div>
-          <button onClick={exportarCSV} style={{ background: 'white', color: '#0f172a', padding: '10px 16px', borderRadius: '10px', fontWeight: '700', border: '1.5px solid var(--border)', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={exportarCSV} className="btn-secondary">
             <Download size={20} color="var(--primary)" /> Exportar
           </button>
-          <button onClick={() => { setUsuarioAEditar(null); setModalAbierto(true); }} style={{ background: 'var(--primary)', color: 'white', padding: '12px 24px', borderRadius: '10px', fontWeight: '800', border: 'none', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={() => { setUsuarioAEditar(null); setModalAbierto(true); }} className="btn-primary">
             <Plus size={20} /> Nuevo Usuario
           </button>
         </div>
       </div>
 
       {seleccionados.length > 0 && (
-        <div style={{ background: '#e0f2fe', padding: '16px 24px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', border: '1px solid #bae6fd' }}>
+        <div className="bulk-bar">
           <span style={{ fontWeight: '800', color: '#0369a1', fontSize: '15px' }}>{seleccionados.length} usuarios seleccionados</span>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="bulk-bar-actions">
             <button onClick={() => handleAccionMasiva('estado', true)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#d1fae5', color: '#059669', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Power size={16} /> Activar</button>
             <button onClick={() => handleAccionMasiva('estado', false)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fef08a', color: '#854d0e', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Power size={16} /> Desactivar</button>
             <button onClick={() => handleAccionMasiva('eliminar')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fee2e2', color: '#dc2626', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Trash2 size={16} /> Eliminar</button>
           </div>
         </div>
       )}
-      
-      {/* Contenedor fusionado: Tabla + Paginación */}
-      <div style={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', background: 'white' }}>
+
+      <div className="table-card">
         <UsuariosTabla usuarios={usuariosPaginados} onToggleEstado={handleToggleEstado} onEdit={u => { setUsuarioAEditar(u); setModalAbierto(true); }} onDelete={setUsuarioAEliminar} seleccionados={seleccionados} onSelect={handleSelect} onSelectAll={handleSelectAll} />
         <Pagination paginaActual={paginaActual} totalPaginas={totalPaginas} onPageChange={setPaginaActual} registrosPorPagina={registrosPorPagina} onRegistrosChange={(val) => { setRegistrosPorPagina(val); setPaginaActual(1); }} totalRegistros={totalRegistros} />
       </div>

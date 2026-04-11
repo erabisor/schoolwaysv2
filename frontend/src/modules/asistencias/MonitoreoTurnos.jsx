@@ -35,7 +35,6 @@ const MonitoreoTurnos = () => {
 
   useEffect(() => { cargarDatos(); }, []);
 
-  // --- FUNCIONES DE FORMATEO Y VALIDACIÓN ---
   const formatearFechaCorta = (fechaStr) => {
     if (!fechaStr) return 'N/A';
     const fecha = new Date(fechaStr);
@@ -57,11 +56,11 @@ const MonitoreoTurnos = () => {
     return fechaFinal < hoy;
   };
 
-  // --- FILTRADO DE CONDUCTORES ---
   const getConductoresDisponibles = () => {
     const ocupados = turnos.map(t => Number(t.ConductorID));
     return todosLosConductores.filter(c => {
-      const uId = Number(c.UsuarioID);
+      // CORRECCIÓN VITAL: El Turno se enlaza mediante el UsuarioID, no el ConductorID real
+      const uId = Number(c.UsuarioID); 
       const nombre = c.NombreCompleto || '';
       if (!nombre.toLowerCase().includes(busquedaConductor.toLowerCase())) return false;
       if (ocupados.includes(uId)) return false;
@@ -70,7 +69,6 @@ const MonitoreoTurnos = () => {
     });
   };
 
-  // --- ACCIONES DEL SISTEMA ---
   const confirmarCierre = (ids) => {
     const idsProcesar = Array.isArray(ids) ? ids : [ids];
     setModalAbierto({
@@ -112,7 +110,6 @@ const MonitoreoTurnos = () => {
           <button onClick={cargarDatos} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'white', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><RefreshCw size={16} /> Actualizar Datos</button>
         </div>
 
-        {/* BOTÓN DE CIERRE MASIVO */}
         {seleccionados.length > 0 && (
           <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 24px', borderRadius: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: '700', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckSquare size={20} /> {seleccionados.length} turno(s) seleccionado(s)</span>
@@ -126,7 +123,6 @@ const MonitoreoTurnos = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', position: 'relative' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8fafc', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
-                {/* Único ancho fijo permitido para el checkbox */}
                 <th style={{ padding: '16px', width: '40px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                   <input type="checkbox" checked={seleccionados.length === turnosActuales.length && turnosActuales.length > 0} onChange={(e) => setSeleccionados(e.target.checked ? turnosActuales.map(t => t.TurnoConductorID) : [])} style={{ cursor: 'pointer' }} />
                 </th>
@@ -151,7 +147,6 @@ const MonitoreoTurnos = () => {
                     <td style={{ padding: '16px' }}>{t.NombreConductor}</td>
                     <td style={{ padding: '16px' }}>{new Date(t.HoraApertura).toLocaleTimeString()}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                      {/* Botones Flexibles: no rompen la tabla */}
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                         <button 
                           onClick={() => { setModalReasignar({ mostrar: true, turnoId: t.TurnoConductorID }); setConductorSeleccionado(null); }} 
@@ -174,7 +169,6 @@ const MonitoreoTurnos = () => {
           </table>
         </div>
 
-        {/* PAGINACIÓN */}
         {!cargando && turnos.length > 0 && (
           <div style={{ padding: '16px 24px', background: 'white', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -194,7 +188,6 @@ const MonitoreoTurnos = () => {
         )}
       </div>
 
-      {/* MODAL DE REASIGNACIÓN */}
       {modalReasignar.mostrar && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '16px', maxWidth: '500px', width: '90%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
@@ -219,7 +212,8 @@ const MonitoreoTurnos = () => {
                         if (vencida) {
                           setModalAbierto({ mostrar: true, soloAlerta: true, titulo: 'Atención: Licencia Vencida', mensaje: `No puedes asignar a ${c.NombreCompleto} porque su licencia venció el ${formatearFechaCorta(c.VencimientoLicencia)}.`, colorBoton: '#dc2626', textoBoton: 'Entendido', accion: () => setModalAbierto({ mostrar: false }) });
                         } else {
-                          setConductorSeleccionado(Number(c.UsuarioID));
+                          // SE GUARDA EL USUARIO ID PARA EL TURNO
+                          setConductorSeleccionado(Number(c.UsuarioID)); 
                         }
                       }}
                       style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: Number(conductorSeleccionado) === Number(c.UsuarioID) ? '#eff6ff' : 'white', opacity: vencida ? 0.6 : 1, transition: 'background 0.2s' }}
@@ -242,7 +236,6 @@ const MonitoreoTurnos = () => {
         </div>
       )}
 
-      {/* MODAL DE ALERTA O CONFIRMACIÓN DE CIERRE */}
       {modalAbierto.mostrar && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '16px', maxWidth: '450px', width: '90%', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>

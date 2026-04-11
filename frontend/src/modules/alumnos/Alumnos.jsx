@@ -4,7 +4,7 @@ import { getAlumnos, toggleEstadoAlumno, crearAlumno, editarAlumno, eliminarAlum
 import AlumnosTabla from './AlumnosTabla';
 import AlumnosModal from './AlumnosModal';
 import ConfirmarEliminarModal from '../../components/ConfirmarEliminarModal';
-import Pagination from '../../components/Pagination'; // <--- IMPORTAMOS PAGINACIÓN
+import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
 
 const Alumnos = () => {
@@ -17,19 +17,16 @@ const Alumnos = () => {
   const [seleccionados, setSeleccionados] = useState([]);
   const [toast, setToast] = useState({ mensaje: '', tipo: '' });
 
-  // --- NUEVOS ESTADOS DE PAGINACIÓN ---
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
 
-  // Regresar a la página 1 si el usuario escribe en el buscador o filtra
   useEffect(() => { setPaginaActual(1); }, [busqueda, filtroRuta]);
-  // ------------------------------------
 
   const cargarDatos = async () => {
     try {
       const res = await getAlumnos();
       setAlumnos(res.data.data);
-      setSeleccionados([]); 
+      setSeleccionados([]);
     } catch (error) { mostrarToast('Error al cargar alumnos', 'error'); }
   };
 
@@ -46,12 +43,12 @@ const Alumnos = () => {
     try {
       if (alumnoAEditar) {
         await editarAlumno(alumnoAEditar.AlumnoID, datos);
-        setAlumnoAEditar(null); 
+        setAlumnoAEditar(null);
       } else {
         await crearAlumno(datos);
       }
       setModalAbierto(false);
-      await cargarDatos(); 
+      await cargarDatos();
       mostrarToast('Operación exitosa', 'success');
     } catch (error) { mostrarToast('Error al guardar', 'error'); }
   };
@@ -76,26 +73,22 @@ const Alumnos = () => {
   const rutasDisponibles = [...new Set(alumnos.map(a => a.NombreRuta).filter(Boolean))];
 
   const alumnosFiltrados = alumnos.filter(a => {
-    const coincideTexto = a.NombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) || 
+    const coincideTexto = a.NombreCompleto.toLowerCase().includes(busqueda.toLowerCase()) ||
                           (a.NombrePadre && a.NombrePadre.toLowerCase().includes(busqueda.toLowerCase()));
     const coincideRuta = filtroRuta === '' || (filtroRuta === 'Sin Ruta' ? !a.NombreRuta : a.NombreRuta === filtroRuta);
     return coincideTexto && coincideRuta;
   });
 
-  // --- LÓGICA DE PAGINACIÓN (Frontend Slice) ---
   const totalRegistros = alumnosFiltrados.length;
   const totalPaginas = registrosPorPagina === 'Todos' ? 1 : Math.ceil(totalRegistros / registrosPorPagina);
   const indiceUltimo = registrosPorPagina === 'Todos' ? totalRegistros : paginaActual * registrosPorPagina;
   const indicePrimer = registrosPorPagina === 'Todos' ? 0 : indiceUltimo - registrosPorPagina;
   const alumnosPaginados = alumnosFiltrados.slice(indicePrimer, indiceUltimo);
 
-  // Asegurar que si borramos elementos y la página queda vacía, nos regrese a la anterior
   useEffect(() => {
     if (paginaActual > totalPaginas && totalPaginas > 0) setPaginaActual(totalPaginas);
   }, [totalPaginas, paginaActual]);
-  // ----------------------------------------------
 
-  // El "Seleccionar Todos" ahora solo selecciona la página que estás viendo
   const handleSelect = (id) => setSeleccionados(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   const handleSelectAll = (checked) => setSeleccionados(checked ? alumnosPaginados.map(a => a.AlumnoID) : []);
 
@@ -128,66 +121,62 @@ const Alumnos = () => {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#0f172a' }}>Alumnos</h1>
-        
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '8px 16px', borderRadius: '10px', border: '1.5px solid var(--border)' }}>
-            <Search size={18} color="var(--text-muted)" />
-            <input type="text" placeholder="Buscar alumno o padre..." style={{ border: 'none', outline: 'none', width: '200px', fontWeight: '500' }} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 16px', borderRadius: '10px', border: '1.5px solid var(--border)' }}>
+      <div className="page-header">
+        <h1>Alumnos</h1>
+        <div className="header-actions">
+          <div className="search-box">
+            <Search size={18} color="var(--text-muted)" />
+            <input type="text" placeholder="Buscar alumno o padre..." className="search-input" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          </div>
+          <div className="filter-box">
             <Filter size={18} color="var(--text-muted)" />
-            <select style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontWeight: '500', padding: '8px 0', cursor: 'pointer' }} value={filtroRuta} onChange={(e) => setFiltroRuta(e.target.value)}>
+            <select className="filter-select" value={filtroRuta} onChange={(e) => setFiltroRuta(e.target.value)}>
               <option value="">Todas las rutas</option>
               <option value="Sin Ruta">-- Sin Ruta Asignada --</option>
               {rutasDisponibles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-
-          <button onClick={exportarCSV} style={{ background: 'white', color: '#0f172a', padding: '10px 16px', borderRadius: '10px', fontWeight: '700', border: '1.5px solid var(--border)', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={exportarCSV} className="btn-secondary">
             <Download size={20} color="var(--primary)" /> Exportar
           </button>
-
-          <button onClick={() => { setAlumnoAEditar(null); setModalAbierto(true); }} style={{ background: 'var(--primary)', color: 'white', padding: '12px 24px', borderRadius: '10px', fontWeight: '800', border: 'none', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={() => { setAlumnoAEditar(null); setModalAbierto(true); }} className="btn-primary">
             <Plus size={20} /> Registrar Alumno
           </button>
         </div>
       </div>
 
       {seleccionados.length > 0 && (
-        <div style={{ background: '#e0f2fe', padding: '16px 24px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', border: '1px solid #bae6fd' }}>
+        <div className="bulk-bar">
           <span style={{ fontWeight: '800', color: '#0369a1', fontSize: '15px' }}>{seleccionados.length} alumnos seleccionados</span>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="bulk-bar-actions">
             <button onClick={() => handleAccionMasiva('estado', true)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#d1fae5', color: '#059669', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Power size={16} /> Activar</button>
             <button onClick={() => handleAccionMasiva('estado', false)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fef08a', color: '#854d0e', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Power size={16} /> Desactivar</button>
             <button onClick={() => handleAccionMasiva('eliminar')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#fee2e2', color: '#dc2626', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Trash2 size={16} /> Eliminar</button>
           </div>
         </div>
       )}
-      
-      {/* ATENCIÓN AQUÍ: Pasamos los alumnosPaginados a la tabla en lugar de los filtrados */}
-      <div style={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', background: 'white' }}>
-        <AlumnosTabla 
-          alumnos={alumnosPaginados} 
-          onToggleEstado={handleToggleEstado} 
-          onEdit={handleEditar} 
-          onDelete={setAlumnoAEliminar} 
+
+      <div className="table-card">
+        <AlumnosTabla
+          alumnos={alumnosPaginados}
+          onToggleEstado={handleToggleEstado}
+          onEdit={handleEditar}
+          onDelete={setAlumnoAEliminar}
           seleccionados={seleccionados}
           onSelect={handleSelect}
           onSelectAll={handleSelectAll}
         />
-        <Pagination 
-          paginaActual={paginaActual} 
-          totalPaginas={totalPaginas} 
-          onPageChange={setPaginaActual} 
-          registrosPorPagina={registrosPorPagina} 
-          onRegistrosChange={(val) => { setRegistrosPorPagina(val); setPaginaActual(1); }} 
-          totalRegistros={totalRegistros} 
+        <Pagination
+          paginaActual={paginaActual}
+          totalPaginas={totalPaginas}
+          onPageChange={setPaginaActual}
+          registrosPorPagina={registrosPorPagina}
+          onRegistrosChange={(val) => { setRegistrosPorPagina(val); setPaginaActual(1); }}
+          totalRegistros={totalRegistros}
         />
       </div>
-      
+
       {modalAbierto && <AlumnosModal alumnoAEditar={alumnoAEditar} onClose={() => setModalAbierto(false)} onSave={handleGuardar} />}
       {alumnoAEliminar && <ConfirmarEliminarModal mensaje={`¿Eliminar al alumno ${alumnoAEliminar.NombreCompleto}?`} onClose={() => setAlumnoAEliminar(null)} onConfirm={confirmarYeliminar} />}
       <Toast mensaje={toast.mensaje} tipo={toast.tipo} onClose={() => setToast({ mensaje: '', tipo: '' })} />
