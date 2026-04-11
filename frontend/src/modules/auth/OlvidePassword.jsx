@@ -1,27 +1,41 @@
 import React, { useState } from 'react';
-import api from '../../api/axios'; // Importamos tu instancia configurada de Axios
 import { Link } from 'react-router-dom';
+import { ArrowLeft, Mail } from 'lucide-react';
+import api from '../../api/axios';
+
+const APP_VERSION = '2.0.0';
+const APP_YEAR    = new Date().getFullYear();
+
+// SVG del bus reutilizado del Login
+const BusIcon = ({ size = 28, color = 'white' }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
+    <rect x="6"  y="18" width="52" height="30" rx="6" fill={color} fillOpacity="0.9"/>
+    <rect x="10" y="22" width="18" height="12" rx="3" fill="#2563eb"/>
+    <rect x="32" y="22" width="18" height="12" rx="3" fill="#2563eb"/>
+    <circle cx="16" cy="52" r="5" fill={color} fillOpacity="0.9"/>
+    <circle cx="48" cy="52" r="5" fill={color} fillOpacity="0.9"/>
+    <rect x="6"  y="34" width="52" height="4" fill={color} fillOpacity="0.25"/>
+    <rect x="56" y="24" width="4"  height="8" rx="2" fill={color} fillOpacity="0.7"/>
+  </svg>
+);
 
 const OlvidePassword = () => {
-  const [correo, setCorreo] = useState('');
-  const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
+  const [correo,   setCorreo]   = useState('');
+  const [mensaje,  setMensaje]  = useState({ texto: '', tipo: '' });
   const [cargando, setCargando] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCargando(true);
     setMensaje({ texto: '', tipo: '' });
-
     try {
-      // Nota: Usamos 'api' en lugar de 'axios' para usar tu base URL configurada
-      const response = await api.post('/auth/olvide-password', { correo });
-      setMensaje({ texto: response.data.mensaje, tipo: 'exito' });
+      const res = await api.post('/auth/olvide-password', { correo });
+      setMensaje({ texto: res.data.mensaje, tipo: 'exito' });
       setCorreo('');
-    } catch (error) {
-      console.error(error);
-      setMensaje({ 
-        texto: error.response?.data?.mensaje || 'Ocurrió un error al procesar la solicitud.', 
-        tipo: 'error' 
+    } catch (err) {
+      setMensaje({
+        texto: err.response?.data?.mensaje || 'Ocurrió un error al procesar la solicitud.',
+        tipo: 'error'
       });
     } finally {
       setCargando(false);
@@ -29,83 +43,114 @@ const OlvidePassword = () => {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f3f4f6' }}>
-      <div style={{ 
-        backgroundColor: 'white', 
-        padding: '40px', 
-        borderRadius: '16px', 
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', 
-        width: '100%', 
-        maxWidth: '400px' 
+    <div style={{
+      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg-light)', padding: '24px'
+    }}>
+
+      {/* Tarjeta */}
+      <div style={{
+        background: 'white', borderRadius: '20px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+        width: '100%', maxWidth: '420px', padding: '36px'
       }}>
-        <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Recuperar Contraseña</h2>
-        <p style={{ color: '#6b7280', marginBottom: '24px', fontSize: '15px' }}>
-          Ingresa tu correo para recibir un enlace de restablecimiento.
+
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+          <div style={{
+            background: 'var(--primary)', borderRadius: '12px', padding: '8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <BusIcon size={28} color="white" />
+          </div>
+          <div>
+            <p style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
+              SchoolWaySV
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, fontWeight: '500' }}>
+              v{APP_VERSION} · Transporte Escolar
+            </p>
+          </div>
+        </div>
+
+        {/* Ícono de sobre */}
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '16px',
+          background: '#dbeafe', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', marginBottom: '20px'
+        }}>
+          <Mail size={28} color="var(--primary)" />
+        </div>
+
+        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>
+          Recuperar Contraseña
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
+          Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
         </p>
-        
+
+        {/* Mensaje de respuesta */}
         {mensaje.texto && (
-          <div style={{ 
-            padding: '12px', 
-            marginBottom: '20px', 
-            borderRadius: '8px', 
-            fontSize: '14px',
-            backgroundColor: mensaje.tipo === 'exito' ? '#dcfce7' : '#fee2e2', 
-            color: mensaje.tipo === 'exito' ? '#166534' : '#991b1b',
-            border: `1px solid ${mensaje.tipo === 'exito' ? '#bbf7d0' : '#fecaca'}`
+          <div style={{
+            padding: '12px 16px', marginBottom: '20px', borderRadius: '10px', fontSize: '14px',
+            background: mensaje.tipo === 'exito' ? '#f0fdf4' : '#fef2f2',
+            color:      mensaje.tipo === 'exito' ? '#166534' : '#991b1b',
+            border:     `1px solid ${mensaje.tipo === 'exito' ? '#bbf7d0' : '#fecaca'}`,
+            fontWeight: '500'
           }}>
             {mensaje.texto}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-              Correo Electrónico:
-            </label>
-            <input
-              type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              required
-              placeholder="admin@schoolwaysv.com"
-              style={{ 
-                width: '100%', 
-                padding: '12px 16px', 
-                borderRadius: '10px', 
-                border: 'none', 
-                backgroundColor: '#eef2ff', // El celeste del login
-                fontSize: '15px',
-                outline: 'none'
-              }}
-            />
-          </div>
-          
-          <button 
-            type="submit" 
-            disabled={cargando}
-            style={{ 
-              width: '100%', 
-              padding: '14px', 
-              backgroundColor: '#2563eb', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '10px', 
-              fontWeight: '600', 
-              fontSize: '16px',
-              cursor: cargando ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s'
-            }}
-          >
-            {cargando ? 'Procesando...' : 'Enviar Enlace'}
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#374151', marginBottom: '6px' }}>
+            Correo electrónico
+          </label>
+          <input
+            type="email"
+            value={correo}
+            onChange={e => setCorreo(e.target.value)}
+            required
+            placeholder="correo@schoolwaysv.com"
+            className="form-input"
+            autoComplete="email"
+            inputMode="email"
+          />
+
+          <button type="submit" disabled={cargando} style={{
+            width: '100%', padding: '14px', marginTop: '4px',
+            background: cargando ? '#93c5fd' : 'var(--primary)',
+            color: 'white', border: 'none', borderRadius: '12px',
+            fontWeight: '800', fontSize: '15px',
+            cursor: cargando ? 'not-allowed' : 'pointer',
+            transition: 'background 0.2s'
+          }}>
+            {cargando ? 'Enviando...' : 'Enviar Enlace'}
           </button>
         </form>
-        
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
-          <Link to="/login" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500', fontSize: '14px' }}>
-            Volver al Inicio de Sesión
+
+        {/* Volver */}
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <Link to="/login" style={{
+            color: 'var(--primary)', textDecoration: 'none',
+            fontWeight: '600', fontSize: '13px',
+            display: 'inline-flex', alignItems: 'center', gap: '6px'
+          }}>
+            <ArrowLeft size={14} /> Volver al inicio de sesión
           </Link>
         </div>
       </div>
+
+      {/* Firma */}
+      <p style={{
+        marginTop: '24px', fontSize: '11px',
+        color: '#cbd5e1', fontWeight: '500', textAlign: 'center', lineHeight: '1.6'
+      }}>
+        SchoolWaySV v{APP_VERSION} · © {APP_YEAR} · El Salvador
+        <br />
+        <span style={{ fontSize: '10px' }}>Sistema de Administración de Transporte Escolar</span>
+      </p>
     </div>
   );
 };
