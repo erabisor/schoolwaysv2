@@ -7,11 +7,11 @@ const dbConfig = {
   server:   process.env.DB_SERVER,
   database: process.env.DB_NAME,
   port:     parseInt(process.env.DB_PORT, 10) || 1433,
+  
   options: {
-    // En producción (NODE_ENV=production) se activa el cifrado TLS
-    encrypt: process.env.NODE_ENV === 'production',
-    trustServerCertificate: process.env.NODE_ENV !== 'production'
-  }
+  encrypt: true,
+  trustServerCertificate: true  // SQL Server Express usa certificado autofirmado
+}
 };
 
 const poolPromise = new sql.ConnectionPool(dbConfig)
