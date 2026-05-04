@@ -10,7 +10,7 @@ const dbConfig = {
   
   options: {
   encrypt: true,
-  trustServerCertificate: true  // SQL Server Express usa certificado autofirmado
+  trustServerCertificate: true  
 }
 };
 
@@ -22,7 +22,7 @@ const poolPromise = new sql.ConnectionPool(dbConfig)
   })
   .catch(err => {
     console.error('[db] Error de conexion:', err.message);
-    process.exit(1); // Si no hay BD, el servidor no debe seguir corriendo
+    process.exit(1); // Si no hay conexion a la base de datos termina la aplicacion
   });
 
 module.exports = { sql, poolPromise };

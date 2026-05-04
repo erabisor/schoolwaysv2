@@ -1,186 +1,484 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Home, MapPin, School } from 'lucide-react';
 import { getOpcionesAlumno } from './alumnos.api';
+import SelectorUbicacionMapa from './SelectorUbicacionMapa';
+import SearchableSelect from './SearchableSelect';
+
+const DEFAULT_FORM = {
+  NombreCompleto: '',
+  Grado: '',
+  Seccion: '',
+  Direccion: '',
+  PuntoReferencia: '',
+  UsuarioID: '',
+  RutaID: '',
+  TipoServicio: 'Ambos',
+  CasaLatitud: '',
+  CasaLongitud: '',
+  ColegioLatitud: '',
+  ColegioLongitud: ''
+};
+
+const COLEGIO_DEFAULT = {
+  lat: 13.7012,
+  lng: -89.2243
+};
+
+const normalizarValor = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  return valor;
+};
+
+const normalizarNumero = (valor) => {
+  if (valor === undefined || valor === null || valor === '') return '';
+
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : '';
+};
+
+const tieneUbicacion = (lat, lng) => {
+  return (
+    lat !== '' &&
+    lng !== '' &&
+    Number.isFinite(Number(lat)) &&
+    Number.isFinite(Number(lng))
+  );
+};
+
+const UbicacionResumen = ({ tipo, lat, lng, onSeleccionar, onUsarDefault }) => {
+  const configurada = tieneUbicacion(lat, lng);
+  const esCasa = tipo === 'casa';
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: '14px',
+        padding: '14px',
+        background: configurada ? '#f0fdf4' : '#f8fafc'
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          marginBottom: '10px'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: '800',
+            color: '#0f172a'
+          }}
+        >
+          {esCasa ? (
+            <Home size={18} color="var(--primary)" />
+          ) : (
+            <School size={18} color="var(--primary)" />
+          )}
+          {esCasa ? 'Casa del alumno' : 'Colegio'}
+        </div>
+
+        {configurada && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: '#059669',
+              fontSize: '12px',
+              fontWeight: '800'
+            }}
+          >
+            <CheckCircle2 size={14} />
+            Configurada
+          </span>
+        )}
+      </div>
+
+      <div
+        style={{
+          color: configurada ? '#166534' : 'var(--text-muted)',
+          fontSize: '13px',
+          fontWeight: '600',
+          marginBottom: '12px'
+        }}
+      >
+        {configurada
+          ? `Lat: ${Number(lat).toFixed(7)} · Lng: ${Number(lng).toFixed(7)}`
+          : 'Ubicación pendiente de seleccionar'}
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={onSeleccionar}
+          className="btn-secondary"
+          style={{ padding: '8px 10px', fontSize: '13px' }}
+        >
+          <MapPin size={15} color="var(--primary)" />
+          Seleccionar en mapa
+        </button>
+
+        {!esCasa && (
+          <button
+            type="button"
+            onClick={onUsarDefault}
+            className="btn-secondary"
+            style={{ padding: '8px 10px', fontSize: '13px' }}
+          >
+            Usar ubicación del colegio
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const AlumnosModal = ({ onClose, onSave, alumnoAEditar }) => {
   const [opciones, setOpciones] = useState({ padres: [], rutas: [] });
   const [cargando, setCargando] = useState(true);
-  const [datos, setDatos] = useState({
-    NombreCompleto: '', 
-    Grado: '', 
-    Direccion: '', 
-    PuntoReferencia: '', 
-    UsuarioID: '', 
-    RutaID: '',
-    TipoServicio: 'Ambos' // <-- NUEVO: Valor por defecto
-  });
+  const [datos, setDatos] = useState(DEFAULT_FORM);
+  const [selectorMapa, setSelectorMapa] = useState(null);
+
+  const esEdicion = Boolean(alumnoAEditar);
 
   useEffect(() => {
     const cargarOpciones = async () => {
       try {
         setCargando(true);
-        const res = await getOpcionesAlumno();
-        const data = res.data.data;
-        setOpciones(data);
 
-        if (!alumnoAEditar && data.padres.length > 0) {
-          setDatos(d => ({ ...d, UsuarioID: data.padres[0].UsuarioID }));
+        const res = await getOpcionesAlumno();
+        const data = res.data.data || {};
+
+        setOpciones({
+          padres: data.padres || [],
+          rutas: data.rutas || []
+        });
+
+        if (!alumnoAEditar && data.padres?.length > 0) {
+          setDatos((prev) => ({
+            ...prev,
+            UsuarioID: data.padres[0].UsuarioID
+          }));
         }
       } catch (error) {
-        console.error("Error al cargar opciones:", error);
+        console.error('Error al cargar opciones:', error);
       } finally {
         setCargando(false);
       }
     };
 
     cargarOpciones();
-
-    if (alumnoAEditar) {
-      setDatos({
-        ...alumnoAEditar,
-        UsuarioID: alumnoAEditar.UsuarioID || '', 
-        RutaID: alumnoAEditar.RutaID || '',
-        TipoServicio: alumnoAEditar.TipoServicio || 'Ambos' // <-- NUEVO: Carga valor existente
-      });
-    }
   }, [alumnoAEditar]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(datos);
+  useEffect(() => {
+    if (!alumnoAEditar) {
+      setDatos((prev) => ({
+        ...DEFAULT_FORM,
+        UsuarioID: prev.UsuarioID || ''
+      }));
+      return;
+    }
+
+    setDatos({
+      NombreCompleto: normalizarValor(alumnoAEditar.NombreCompleto),
+      Grado: normalizarValor(alumnoAEditar.Grado),
+      Seccion: normalizarValor(alumnoAEditar.Seccion),
+      Direccion: normalizarValor(alumnoAEditar.Direccion),
+      PuntoReferencia: normalizarValor(alumnoAEditar.PuntoReferencia),
+      UsuarioID: normalizarValor(alumnoAEditar.UsuarioID),
+      RutaID: normalizarValor(alumnoAEditar.RutaID),
+      TipoServicio: normalizarValor(alumnoAEditar.TipoServicio) || 'Ambos',
+      CasaLatitud: normalizarNumero(alumnoAEditar.CasaLatitud),
+      CasaLongitud: normalizarNumero(alumnoAEditar.CasaLongitud),
+      ColegioLatitud: normalizarNumero(alumnoAEditar.ColegioLatitud),
+      ColegioLongitud: normalizarNumero(alumnoAEditar.ColegioLongitud)
+    });
+  }, [alumnoAEditar]);
+
+  const padresConActual = useMemo(() => {
+    if (!alumnoAEditar?.UsuarioID) return opciones.padres;
+
+    const existe = opciones.padres.some(
+      (padre) => Number(padre.UsuarioID) === Number(alumnoAEditar.UsuarioID)
+    );
+
+    if (existe) return opciones.padres;
+
+    return [
+      {
+        UsuarioID: alumnoAEditar.UsuarioID,
+        NombreCompleto: `${alumnoAEditar.NombrePadre || 'Responsable actual'} (Conservar actual)`
+      },
+      ...opciones.padres
+    ];
+  }, [alumnoAEditar, opciones.padres]);
+
+  const setCampo = (campo, valor) => {
+    setDatos((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const abrirSelectorCasa = () => {
+    setSelectorMapa({
+      tipo: 'casa',
+      titulo: 'Seleccionar casa del alumno',
+      descripcion: 'Haz click en el mapa o arrastra el marcador hasta la ubicación de la casa.',
+      posicionInicial: {
+        lat: datos.CasaLatitud || COLEGIO_DEFAULT.lat,
+        lng: datos.CasaLongitud || COLEGIO_DEFAULT.lng
+      }
+    });
+  };
+
+  const abrirSelectorColegio = () => {
+    setSelectorMapa({
+      tipo: 'colegio',
+      titulo: 'Seleccionar ubicación del colegio',
+      descripcion: 'Haz click en el mapa o arrastra el marcador hasta la ubicación del colegio.',
+      posicionInicial: {
+        lat: datos.ColegioLatitud || COLEGIO_DEFAULT.lat,
+        lng: datos.ColegioLongitud || COLEGIO_DEFAULT.lng
+      }
+    });
+  };
+
+  const confirmarUbicacion = ({ lat, lng }) => {
+    if (selectorMapa?.tipo === 'casa') {
+      setDatos((prev) => ({
+        ...prev,
+        CasaLatitud: lat,
+        CasaLongitud: lng
+      }));
+    }
+
+    if (selectorMapa?.tipo === 'colegio') {
+      setDatos((prev) => ({
+        ...prev,
+        ColegioLatitud: lat,
+        ColegioLongitud: lng
+      }));
+    }
+
+    setSelectorMapa(null);
+  };
+
+  const usarColegioDefault = () => {
+    setDatos((prev) => ({
+      ...prev,
+      ColegioLatitud: COLEGIO_DEFAULT.lat,
+      ColegioLongitud: COLEGIO_DEFAULT.lng
+    }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    onSave({
+      ...datos,
+      UsuarioID: datos.UsuarioID ? Number(datos.UsuarioID) : null,
+      RutaID: datos.RutaID ? Number(datos.RutaID) : null,
+      CasaLatitud: datos.CasaLatitud === '' ? null : Number(datos.CasaLatitud),
+      CasaLongitud: datos.CasaLongitud === '' ? null : Number(datos.CasaLongitud),
+      ColegioLatitud: datos.ColegioLatitud === '' ? null : Number(datos.ColegioLatitud),
+      ColegioLongitud: datos.ColegioLongitud === '' ? null : Number(datos.ColegioLongitud)
+    });
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '24px' }}>
-          {alumnoAEditar ? 'Editar Alumno' : 'Registrar Alumno'}
-        </h2>
-        
-        <form onSubmit={handleSubmit}>
-          {/* Campos de Texto Principal */}
-          <input 
-            type="text" placeholder="Nombre del Alumno" required className="form-input" 
-            value={datos.NombreCompleto} 
-            onChange={e => setDatos({...datos, NombreCompleto: e.target.value})} 
-          />
-          
-          <input 
-            type="text" placeholder="Grado Escolar (Ej: 7° Grado)" required className="form-input" 
-            value={datos.Grado} 
-            onChange={e => setDatos({...datos, Grado: e.target.value})} 
-          />
+    <>
+      <div className="modal-overlay">
+        <div
+          className="modal-content"
+          style={{
+            maxWidth: '760px',
+            width: 'min(760px, 96vw)'
+          }}
+        >
+          <h3
+            style={{
+              fontSize: '1.45rem',
+              fontWeight: '800',
+              marginBottom: '18px',
+              color: '#0f172a'
+            }}
+          >
+            {esEdicion ? 'Editar Alumno' : 'Registrar Alumno'}
+          </h3>
 
-          <textarea 
-            placeholder="Dirección completa" required className="form-input" 
-            style={{ resize: 'none', height: '80px' }}
-            value={datos.Direccion} 
-            onChange={e => setDatos({...datos, Direccion: e.target.value})} 
-          />
+          <form onSubmit={handleSubmit}>
+            <div className="two-col-grid">
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Nombre completo del alumno"
+                value={datos.NombreCompleto}
+                onChange={(event) => setCampo('NombreCompleto', event.target.value)}
+                required
+              />
 
-          <input 
-            type="text" placeholder="Punto de referencia (Ej: Portón azul)" required className="form-input" 
-            value={datos.PuntoReferencia} 
-            onChange={e => setDatos({...datos, PuntoReferencia: e.target.value})} 
-          />
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Grado escolar (Ej: 7° Grado)"
+                value={datos.Grado}
+                onChange={(event) => setCampo('Grado', event.target.value)}
+                required
+              />
 
-          {/* Sección de Padre / Responsable */}
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>
-            Padre / Responsable
-          </label>
-          
-          {cargando ? (
-            <div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
-              Cargando responsables...
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Sección (Ej: A)"
+                value={datos.Seccion}
+                onChange={(event) => setCampo('Seccion', event.target.value)}
+              />
+
+              <select
+                className="form-input"
+                value={datos.TipoServicio}
+                onChange={(event) => setCampo('TipoServicio', event.target.value)}
+                required
+              >
+                <option value="Ambos">Ambos (Ida y Vuelta)</option>
+                <option value="Solo Ida">Solo Ida (Casa a Escuela)</option>
+                <option value="Solo Vuelta">Solo Vuelta (Escuela a Casa)</option>
+              </select>
             </div>
-          ) : opciones.padres.length > 0 || alumnoAEditar ? (
-            <select 
-              required 
-              className="form-input" 
-              value={datos.UsuarioID || ''} 
-              onChange={(e) => {
-                const nuevoId = parseInt(e.target.value);
-                setDatos({ ...datos, UsuarioID: nuevoId });
+
+            <textarea
+              className="form-input"
+              rows={3}
+              placeholder="Dirección completa"
+              value={datos.Direccion}
+              onChange={(event) => setCampo('Direccion', event.target.value)}
+              required
+            />
+
+            <input
+              className="form-input"
+              type="text"
+              placeholder="Punto de referencia (Ej: Portón azul)"
+              value={datos.PuntoReferencia}
+              onChange={(event) => setCampo('PuntoReferencia', event.target.value)}
+            />
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: '12px',
+                marginTop: '12px'
               }}
             >
-              <option value="" disabled>Seleccione un responsable</option>
-              
-              {alumnoAEditar && !opciones.padres.find(p => p.UsuarioID === datos.UsuarioID) && (
-                <option value={datos.UsuarioID}>
-                  {alumnoAEditar.NombrePadre} (Conservar actual)
-                </option>
-              )}
-              
-              {opciones.padres.map(p => (
-                <option key={p.UsuarioID} value={p.UsuarioID}>
-                  {p.NombreCompleto}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '16px', fontWeight: '600' }}>
-              ⚠️ Debes crear al menos un usuario con rol "Padre" primero.
-            </p>
-          )}
+              <SearchableSelect
+                label="Padre / Responsable"
+                value={datos.UsuarioID}
+                options={padresConActual}
+                placeholder={cargando ? 'Cargando responsables...' : 'Seleccione un responsable'}
+                searchPlaceholder="Buscar padre por nombre..."
+                getOptionValue={(padre) => padre.UsuarioID}
+                getOptionLabel={(padre) => padre.NombreCompleto}
+                onChange={(value) => setCampo('UsuarioID', value)}
+                required
+                disabled={cargando}
+                allowClear={false}
+                emptyText="No se encontraron responsables"
+              />
 
-          {/* Sección de Ruta */}
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '12px' }}>
-            Ruta Asignada (Opcional)
-          </label>
-          <select 
-            className="form-input" 
-            value={datos.RutaID || ''} 
-            onChange={e => setDatos({...datos, RutaID: e.target.value ? parseInt(e.target.value) : ''})}
-          >
-            <option value="">Ninguna / Sin asignar</option>
-            {opciones.rutas.map(r => (
-              <option key={r.RutaID} value={r.RutaID}>{r.NombreRuta} - {r.Turno}</option>
-            ))}
-          </select>
+              <SearchableSelect
+                label="Ruta asignada"
+                value={datos.RutaID}
+                options={opciones.rutas}
+                placeholder="Ninguna / Sin asignar"
+                searchPlaceholder="Buscar ruta por nombre o turno..."
+                getOptionValue={(ruta) => ruta.RutaID}
+                getOptionLabel={(ruta) => `${ruta.NombreRuta} - ${ruta.Turno}`}
+                onChange={(value) => setCampo('RutaID', value)}
+                disabled={cargando}
+                emptyText="No se encontraron rutas"
+              />
+            </div>
 
-          {/* NUEVA SECCIÓN: TIPO DE SERVICIO */}
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '12px' }}>
-            Tipo de Servicio (Contrato)
-          </label>
-          <select 
-            className="form-input" 
-            value={datos.TipoServicio || 'Ambos'} 
-            onChange={e => setDatos({...datos, TipoServicio: e.target.value})}
-          >
-            <option value="Ambos">Ambos (Ida y Vuelta)</option>
-            <option value="Solo Ida">Solo Ida (Casa a Escuela)</option>
-            <option value="Solo Vuelta">Solo Vuelta (Escuela a Casa)</option>
-          </select>
+            <div style={{ marginTop: '18px', marginBottom: '10px' }}>
+              <h4
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: '800',
+                  color: '#0f172a',
+                  marginBottom: '4px'
+                }}
+              >
+                Ubicaciones
+              </h4>
 
-          {/* Botones de Acción */}
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-            <button 
-              type="button" 
-              onClick={onClose} 
-              style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: 'var(--text-muted)', borderRadius: '10px', border: 'none', fontWeight: '600', cursor: 'pointer' }}
-            >
-              Cancelar
-            </button>
-            <button 
-              type="submit" 
-              disabled={cargando || (!alumnoAEditar && opciones.padres.length === 0)} 
-              style={{ 
-                flex: 1, 
-                padding: '12px', 
-                background: 'var(--primary)', 
-                color: 'white', 
-                borderRadius: '10px', 
-                border: 'none', 
-                fontWeight: '600', 
-                cursor: 'pointer',
-                opacity: (cargando || (!alumnoAEditar && opciones.padres.length === 0)) ? 0.5 : 1 
-              }}
-            >
-              {alumnoAEditar ? 'Actualizar' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+              <p
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: '13px',
+                  marginBottom: '12px'
+                }}
+              >
+                Selecciona las ubicaciones en el mapa. El usuario no necesita escribir coordenadas.
+              </p>
+
+              <div className="two-col-grid" style={{ alignItems: 'stretch' }}>
+                <UbicacionResumen
+                  tipo="casa"
+                  lat={datos.CasaLatitud}
+                  lng={datos.CasaLongitud}
+                  onSeleccionar={abrirSelectorCasa}
+                />
+
+                <UbicacionResumen
+                  tipo="colegio"
+                  lat={datos.ColegioLatitud}
+                  lng={datos.ColegioLongitud}
+                  onSeleccionar={abrirSelectorColegio}
+                  onUsarDefault={usarColegioDefault}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '22px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-secondary"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                {esEdicion ? 'Actualizar' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+
+      <SelectorUbicacionMapa
+        abierto={Boolean(selectorMapa)}
+        titulo={selectorMapa?.titulo}
+        descripcion={selectorMapa?.descripcion}
+        posicionInicial={selectorMapa?.posicionInicial}
+        onConfirmar={confirmarUbicacion}
+        onClose={() => setSelectorMapa(null)}
+      />
+    </>
   );
 };
 

@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Bus, Users, LayoutDashboard, LogOut,
-  UserSquare2, MapPin, GraduationCap, Map, Activity, History
+  UserSquare2, MapPin, GraduationCap, Map, Activity, History, BarChart3
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
@@ -49,6 +49,7 @@ const Sidebar = ({ abierto, onCerrar }) => {
           <NavLink to="/asistencias" className={navClass} onClick={handleNavClick}><Map size={22} /> Asistencia</NavLink>
           <NavLink to="/monitoreo"   className={navClass} onClick={handleNavClick}><Activity size={22} /> Monitoreo en Vivo</NavLink>
           <NavLink to="/historial"   className={navClass} onClick={handleNavClick}><History size={22} /> Reportes Históricos</NavLink>
+          <NavLink to="/reportes"    className={navClass} onClick={handleNavClick}><BarChart3 size={22} /> Reportes</NavLink>
         </>}
 
         {esConductor && <>

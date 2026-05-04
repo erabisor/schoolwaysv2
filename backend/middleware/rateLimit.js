@@ -1,29 +1,45 @@
 const rateLimit = require('express-rate-limit');
 
-// Limita los intentos de login: máx 10 por IP cada 15 minutos
+const getEnvNumber = (key, fallback) => {
+  const value = Number(process.env[key]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const createMessage = (mensaje) => ({
+  ok: false,
+  data: null,
+  mensaje
+});
+
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 10,
+  windowMs: getEnvNumber('LOGIN_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  max: getEnvNumber('LOGIN_RATE_LIMIT_MAX', 10),
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    ok: false,
-    data: null,
-    mensaje: 'Demasiados intentos de inicio de sesión. Espera 15 minutos antes de volver a intentarlo.'
-  }
+  message: createMessage(
+    'Demasiados intentos de inicio de sesión. Espera antes de volver a intentarlo.'
+  )
 });
 
-// Limiter general para la API: máx 300 req por IP cada 15 minutos
+const trackingLimiter = rateLimit({
+  windowMs: getEnvNumber('TRACKING_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: getEnvNumber('TRACKING_RATE_LIMIT_MAX', 240),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: createMessage(
+    'Seguimiento pausado temporalmente por demasiadas actualizaciones.'
+  )
+});
+
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
+  windowMs: getEnvNumber('API_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  max: getEnvNumber('API_RATE_LIMIT_MAX', 300),
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    ok: false,
-    data: null,
-    mensaje: 'Demasiadas peticiones desde esta IP. Intenta más tarde.'
-  }
+  skip: (req) => req.path.startsWith('/asistencias/ubicacion'),
+  message: createMessage(
+    'Demasiadas peticiones desde esta IP. Intenta más tarde.'
+  )
 });
 
-module.exports = { loginLimiter, apiLimiter };
+module.exports = { loginLimiter, apiLimiter, trackingLimiter };

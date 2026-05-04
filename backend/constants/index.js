@@ -1,6 +1,4 @@
-// ============================================================
-// Constantes globales del sistema — usar en lugar de magic strings
-// ============================================================
+// Constantes globales del sistema
 
 const ROL = {
   ADMIN:     1,

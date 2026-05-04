@@ -1,100 +1,329 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Bus, UserRound } from 'lucide-react';
 import { getOpcionesRuta } from './rutas.api';
+import SearchableSelect from '../../components/SearchableSelect';
+
+const DEFAULT_FORM = {
+  NombreRuta: '',
+  Descripcion: '',
+  CapacidadMaxima: 20,
+  ConductorID: '',
+  VehiculoID: '',
+  Turno: 'Mañana'
+};
+
+const normalizarValor = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  return valor;
+};
+
+const normalizarNumero = (valor) => {
+  if (valor === undefined || valor === null || valor === '') return '';
+
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : '';
+};
 
 const RutasModal = ({ onClose, onSave, rutaAEditar }) => {
   const [opciones, setOpciones] = useState({ conductores: [], vehiculos: [] });
-  const [datos, setDatos] = useState({
-    NombreRuta: '', Descripcion: '', CapacidadMaxima: 20, ConductorID: '', VehiculoID: '', Turno: 'Mañana'
-  });
+  const [datos, setDatos] = useState(DEFAULT_FORM);
+  const [cargando, setCargando] = useState(true);
   const [errorValidacion, setErrorValidacion] = useState('');
 
-  useEffect(() => {
-    getOpcionesRuta().then(res => {
-      setOpciones(res.data.data);
-      if (!rutaAEditar) {
-        setDatos(d => ({
-          ...d,
-          ConductorID: res.data.data.conductores[0]?.ConductorID || '',
-          VehiculoID: res.data.data.vehiculos[0]?.VehiculoID || ''
-        }));
-      }
-    });
+  const esEdicion = Boolean(rutaAEditar);
 
-    if (rutaAEditar) setDatos(rutaAEditar);
+  useEffect(() => {
+    const cargarOpciones = async () => {
+      try {
+        setCargando(true);
+        const res = await getOpcionesRuta();
+        const data = res.data.data || {};
+
+        setOpciones({
+          conductores: data.conductores || [],
+          vehiculos: data.vehiculos || []
+        });
+
+        if (!rutaAEditar) {
+          setDatos((prev) => ({
+            ...prev,
+            ConductorID: data.conductores?.[0]?.ConductorID || '',
+            VehiculoID: data.vehiculos?.[0]?.VehiculoID || ''
+          }));
+        }
+      } catch (error) {
+        setErrorValidacion(error.response?.data?.mensaje || 'Error al cargar opciones de ruta.');
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargarOpciones();
   }, [rutaAEditar]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setErrorValidacion('');
-    
-    // VALIDACIÓN ESTRICTA DE NEGOCIO: Sobrecupo
-    const vehiculoSeleccionado = opciones.vehiculos.find(v => v.VehiculoID === datos.VehiculoID);
-    
-    if (vehiculoSeleccionado && datos.CapacidadMaxima > vehiculoSeleccionado.Capacidad) {
-      setErrorValidacion(`Error: La ruta pide ${datos.CapacidadMaxima} cupos, pero el vehículo seleccionado solo tiene ${vehiculoSeleccionado.Capacidad} asientos.`);
-      return; 
+  useEffect(() => {
+    if (!rutaAEditar) {
+      setDatos((prev) => ({
+        ...DEFAULT_FORM,
+        ConductorID: prev.ConductorID || '',
+        VehiculoID: prev.VehiculoID || ''
+      }));
+      return;
     }
 
-    onSave(datos);
+    setDatos({
+      NombreRuta: normalizarValor(rutaAEditar.NombreRuta),
+      Descripcion: normalizarValor(rutaAEditar.Descripcion),
+      CapacidadMaxima: normalizarNumero(rutaAEditar.CapacidadMaxima) || 20,
+      ConductorID: normalizarValor(rutaAEditar.ConductorID),
+      VehiculoID: normalizarValor(rutaAEditar.VehiculoID),
+      Turno: normalizarValor(rutaAEditar.Turno) || 'Mañana'
+    });
+  }, [rutaAEditar]);
+
+  const conductoresConActual = useMemo(() => {
+    if (!rutaAEditar?.ConductorID) return opciones.conductores;
+
+    const existe = opciones.conductores.some(
+      (conductor) => Number(conductor.ConductorID) === Number(rutaAEditar.ConductorID)
+    );
+
+    if (existe) return opciones.conductores;
+
+    return [
+      {
+        ConductorID: rutaAEditar.ConductorID,
+        NombreCompleto: `${rutaAEditar.NombreConductor || 'Conductor actual'} (Conservar actual)`
+      },
+      ...opciones.conductores
+    ];
+  }, [rutaAEditar, opciones.conductores]);
+
+  const vehiculosConActual = useMemo(() => {
+    if (!rutaAEditar?.VehiculoID) return opciones.vehiculos;
+
+    const existe = opciones.vehiculos.some(
+      (vehiculo) => Number(vehiculo.VehiculoID) === Number(rutaAEditar.VehiculoID)
+    );
+
+    if (existe) return opciones.vehiculos;
+
+    return [
+      {
+        VehiculoID: rutaAEditar.VehiculoID,
+        Placa: `${rutaAEditar.Placa || 'Vehículo actual'} (Conservar actual)`,
+        Capacidad: rutaAEditar.CapacidadBus || rutaAEditar.CapacidadMaxima || '?'
+      },
+      ...opciones.vehiculos
+    ];
+  }, [rutaAEditar, opciones.vehiculos]);
+
+  const vehiculoSeleccionado = useMemo(() => {
+    return vehiculosConActual.find(
+      (vehiculo) => String(vehiculo.VehiculoID) === String(datos.VehiculoID)
+    );
+  }, [vehiculosConActual, datos.VehiculoID]);
+
+  const setCampo = (campo, valor) => {
+    setDatos((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const validarFormulario = () => {
+    if (!datos.NombreRuta.trim()) {
+      return 'El nombre de la ruta es obligatorio.';
+    }
+
+    if (!datos.CapacidadMaxima || Number(datos.CapacidadMaxima) <= 0) {
+      return 'La capacidad máxima debe ser mayor que cero.';
+    }
+
+    if (vehiculoSeleccionado && Number(datos.CapacidadMaxima) > Number(vehiculoSeleccionado.Capacidad)) {
+      return `La ruta pide ${datos.CapacidadMaxima} cupos, pero el vehículo seleccionado solo tiene ${vehiculoSeleccionado.Capacidad} asientos.`;
+    }
+
+    return '';
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    const error = validarFormulario();
+
+    if (error) {
+      setErrorValidacion(error);
+      return;
+    }
+
+    setErrorValidacion('');
+
+    onSave({
+      ...datos,
+      CapacidadMaxima: Number(datos.CapacidadMaxima),
+      ConductorID: datos.ConductorID ? Number(datos.ConductorID) : null,
+      VehiculoID: datos.VehiculoID ? Number(datos.VehiculoID) : null
+    });
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '24px' }}>
-          {rutaAEditar ? 'Editar Ruta' : 'Nueva Ruta'}
-        </h2>
-        <form onSubmit={handleSubmit}>
-          <input type="text" placeholder="Nombre de la Ruta (Ej: Escalón - Santa Tecla)" required className="form-input" 
-            value={datos.NombreRuta} onChange={e => setDatos({...datos, NombreRuta: e.target.value})} />
-          
-          <input type="text" placeholder="Descripción breve" className="form-input" 
-            value={datos.Descripcion} onChange={e => setDatos({...datos, Descripcion: e.target.value})} />
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: '720px',
+          width: 'min(720px, 96vw)'
+        }}
+      >
+        <h3
+          style={{
+            fontSize: '1.45rem',
+            fontWeight: '800',
+            marginBottom: '18px',
+            color: '#0f172a'
+          }}
+        >
+          {esEdicion ? 'Editar Ruta' : 'Nueva Ruta'}
+        </h3>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Turno</label>
-              <select className="form-input" value={datos.Turno} onChange={e => setDatos({...datos, Turno: e.target.value})}>
-                <option value="Mañana">Mañana</option>
-                <option value="Tarde">Tarde</option>
-                <option value="Ambos">Ambos</option>
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Capacidad Máx.</label>
-              <input type="number" required className="form-input" min="1" max="100"
-                value={datos.CapacidadMaxima} onChange={e => setDatos({...datos, CapacidadMaxima: parseInt(e.target.value)})} />
+        <form onSubmit={handleSubmit}>
+          <div className="two-col-grid">
+            <input
+              className="form-input"
+              type="text"
+              placeholder="Nombre de la ruta"
+              value={datos.NombreRuta}
+              onChange={(event) => setCampo('NombreRuta', event.target.value)}
+              required
+            />
+
+            <select
+              className="form-input"
+              value={datos.Turno}
+              onChange={(event) => setCampo('Turno', event.target.value)}
+              required
+            >
+              <option value="Mañana">Mañana</option>
+              <option value="Tarde">Tarde</option>
+              <option value="Ambos">Ambos</option>
+            </select>
+          </div>
+
+          <textarea
+            className="form-input"
+            rows={3}
+            placeholder="Descripción de la ruta"
+            value={datos.Descripcion}
+            onChange={(event) => setCampo('Descripcion', event.target.value)}
+          />
+
+          <div className="two-col-grid">
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              max="255"
+              placeholder="Capacidad máxima"
+              value={datos.CapacidadMaxima}
+              onChange={(event) => setCampo('CapacidadMaxima', event.target.value)}
+              required
+            />
+
+            <div
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '12px',
+                background: '#f8fafc',
+                color: '#334155',
+                fontSize: '13px',
+                fontWeight: '700'
+              }}
+            >
+              <Bus size={16} color="var(--primary)" />
+              <span style={{ marginLeft: '6px' }}>
+                Capacidad del vehículo:{' '}
+                {vehiculoSeleccionado?.Capacidad || 'Seleccione vehículo'}
+              </span>
             </div>
           </div>
-          
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Conductor Asignado</label>
-          <select required className="form-input" value={datos.ConductorID} onChange={e => setDatos({...datos, ConductorID: parseInt(e.target.value)})}>
-            <option value="" disabled>Seleccione un conductor</option>
-            {rutaAEditar && !opciones.conductores.find(c => c.ConductorID === rutaAEditar.ConductorID) && (
-              <option value={rutaAEditar.ConductorID}>{rutaAEditar.NombreConductor} (Conservar actual)</option>
-            )}
-            {opciones.conductores.map(c => <option key={c.ConductorID} value={c.ConductorID}>{c.NombreCompleto}</option>)}
-          </select>
 
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Vehículo Asignado</label>
-          <select required className="form-input" value={datos.VehiculoID} onChange={e => setDatos({...datos, VehiculoID: parseInt(e.target.value)})}>
-            <option value="" disabled>Seleccione un vehículo</option>
-            {rutaAEditar && !opciones.vehiculos.find(v => v.VehiculoID === rutaAEditar.VehiculoID) && (
-              <option value={rutaAEditar.VehiculoID}>{rutaAEditar.Placa} (Conservar actual)</option>
-            )}
-            {opciones.vehiculos.map(v => <option key={v.VehiculoID} value={v.VehiculoID}>{v.Placa} - Cap: {v.Capacidad}</option>)}
-          </select>
+          <div
+            style={{
+              display: 'grid',
+              gap: '12px',
+              marginTop: '12px'
+            }}
+          >
+            <SearchableSelect
+              label="Conductor asignado"
+              value={datos.ConductorID}
+              options={conductoresConActual}
+              placeholder={cargando ? 'Cargando conductores...' : 'Seleccione un conductor'}
+              searchPlaceholder="Buscar conductor por nombre..."
+              getOptionValue={(conductor) => conductor.ConductorID}
+              getOptionLabel={(conductor) => conductor.NombreCompleto}
+              onChange={(value) => setCampo('ConductorID', value)}
+              disabled={cargando}
+              emptyText="No se encontraron conductores disponibles"
+            />
 
-          {/* MENSAJE DE ERROR DE VALIDACIÓN */}
+            <SearchableSelect
+              label="Vehículo asignado"
+              value={datos.VehiculoID}
+              options={vehiculosConActual}
+              placeholder={cargando ? 'Cargando vehículos...' : 'Seleccione un vehículo'}
+              searchPlaceholder="Buscar vehículo por placa, marca o modelo..."
+              getOptionValue={(vehiculo) => vehiculo.VehiculoID}
+              getOptionLabel={(vehiculo) => {
+                const capacidad = vehiculo.Capacidad || '?';
+                const marcaModelo = [vehiculo.Marca, vehiculo.Modelo].filter(Boolean).join(' ');
+                return `${vehiculo.Placa}${marcaModelo ? ` · ${marcaModelo}` : ''} · Cap: ${capacidad}`;
+              }}
+              onChange={(value) => setCampo('VehiculoID', value)}
+              disabled={cargando}
+              emptyText="No se encontraron vehículos disponibles"
+            />
+          </div>
+
           {errorValidacion && (
-            <div style={{ marginTop: '16px', padding: '12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '12px',
+                borderRadius: '12px',
+                background: '#fee2e2',
+                color: '#b91c1c',
+                fontWeight: '800',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <AlertTriangle size={18} />
               {errorValidacion}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: 'var(--text-muted)', borderRadius: '10px', border: 'none', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
-            <button type="submit" style={{ flex: 1, padding: '12px', background: 'var(--primary)', color: 'white', borderRadius: '10px', border: 'none', fontWeight: '600', cursor: 'pointer' }}>{rutaAEditar ? 'Actualizar' : 'Guardar'}</button>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '22px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary"
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              <UserRound size={18} />
+              {esEdicion ? 'Actualizar' : 'Guardar'}
+            </button>
           </div>
         </form>
       </div>
