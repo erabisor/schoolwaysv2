@@ -1,6 +1,10 @@
 services:
-  frontend:
-    build: ./frontend
+  
+frontend:
+  build:
+    context: ./frontend
+    args:
+      REACT_APP_API_URL: ${REACT_APP_API_URL}
     container_name: schoolways_frontend
     ports:
       - "3000:3000"
