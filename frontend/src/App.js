@@ -22,6 +22,7 @@ import Mantenimientos from './modules/mantenimientos/Mantenimientos';
 import Reportes from './modules/reportes/Reportes';
 import DashboardConductor from './modules/conductor/DashboardConductor';
 import PortalPadre from './modules/padre/PortalPadre';
+import InstallBanner from './components/InstallBanner';
 import NotificacionesPadre from './modules/padre/NotificacionesPadre';
 import HistorialSemanal from './modules/padre/HistorialSemanal';
 
@@ -73,6 +74,7 @@ L.Icon.Default.mergeOptions({
 function App() {
   return (
     <AuthProvider>
+      <InstallBanner />
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
