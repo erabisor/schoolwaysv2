@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { onlyProduction } = require('../../utils/envGuard');
 const repository = require('./usuarios.repository');
 
 const listarUsuarios = async () => {
@@ -28,6 +29,7 @@ const alternarEstado = async (id, estado) => {
 };
 
 const eliminarUsuario = async (id) => {
+  onlyProduction('Eliminar usuarios');
   await repository.eliminar(id);
   return { ok: true, data: null, mensaje: 'Usuario eliminado correctamente' };
 };

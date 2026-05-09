@@ -1,3 +1,4 @@
+require('./config/env');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -47,23 +48,6 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  if (origin && origenesPermitidos.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400');
-
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-
-  next();
-});
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
