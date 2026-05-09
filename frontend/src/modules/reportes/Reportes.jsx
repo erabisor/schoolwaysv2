@@ -28,13 +28,13 @@ const loaders = {
   turnos: getReporteTurnos
 };
 
-const renderReport = (activeTab, data) => {
-  if (activeTab === 'resumen') return <ResumenReport data={data} />;
-  if (activeTab === 'uso-rutas') return <UsoRutasReport data={data} />;
-  if (activeTab === 'mantenimiento-vehiculos') return <MantenimientoVehiculosReport data={data} />;
-  if (activeTab === 'asistencia-estudiante') return <AsistenciaEstudianteReport data={data} />;
-  if (activeTab === 'viajes') return <ViajesReport data={data} />;
-  if (activeTab === 'turnos') return <TurnosReport data={data} />;
+const renderReport = (activeTab, data, filters) => {
+  if (activeTab === 'resumen') return <ResumenReport data={data} filters={filters} />;
+  if (activeTab === 'uso-rutas') return <UsoRutasReport data={data} filters={filters} />;
+  if (activeTab === 'mantenimiento-vehiculos') return <MantenimientoVehiculosReport data={data} filters={filters} />;
+  if (activeTab === 'asistencia-estudiante') return <AsistenciaEstudianteReport data={data} filters={filters} />;
+  if (activeTab === 'viajes') return <ViajesReport data={data} filters={filters} />;
+  if (activeTab === 'turnos') return <TurnosReport data={data} filters={filters} />;
   return null;
 };
 
@@ -44,6 +44,32 @@ const Reportes = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ mensaje: '', tipo: '' });
+
+  const [rutas, setRutas] = useState([]);
+  const [vehiculos, setVehiculos] = useState([]);
+  const [conductores, setConductores] = useState([]);
+  const [alumnos, setAlumnos] = useState([]);
+
+  useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        const api = (await import('../../api/axios')).default;
+        const [resR, resV, resC, resA] = await Promise.allSettled([
+          api.get('/rutas'),
+          api.get('/vehiculos'),
+          api.get('/conductores'),
+          api.get('/alumnos'),
+        ]);
+        if (resR.status === 'fulfilled') setRutas(resR.value.data.data || []);
+        if (resV.status === 'fulfilled') setVehiculos(resV.value.data.data || []);
+        if (resC.status === 'fulfilled') setConductores(resC.value.data.data || []);
+        if (resA.status === 'fulfilled') setAlumnos(resA.value.data.data || []);
+      } catch (e) {
+        console.warn('[Reportes] Error cargando catálogos:', e.message);
+      }
+    };
+    cargarCatalogos();
+  }, []);
 
   const cargar = async () => {
     setLoading(true);
@@ -57,19 +83,44 @@ const Reportes = () => {
     }
   };
 
-  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeTab]);
+  useEffect(() => {
+    cargar();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [activeTab]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <div className="page-header">
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><BarChart3 color="var(--primary)" /> Reportes</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontWeight: '600' }}>Reportes detallados para rutas, mantenimientos, asistencia, viajes y turnos.</p>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <BarChart3 color="var(--primary)" />
+            Reportes
+          </h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+            Reportes detallados para rutas, mantenimientos, asistencia, viajes y turnos.
+          </p>
         </div>
       </div>
+
       <ReportTabs active={activeTab} onChange={(tab) => { setActiveTab(tab); setData(null); }} />
-      <ReportFilterBar filters={filters} onChange={setFilters} onRefresh={cargar} loading={loading} activeTab={activeTab} />
-      {loading ? <div className="card" style={{ padding: '28px', fontWeight: '800', color: 'var(--text-muted)' }}>Generando reporte...</div> : renderReport(activeTab, data)}
+
+      <ReportFilterBar
+        filters={filters}
+        onChange={setFilters}
+        onRefresh={cargar}
+        loading={loading}
+        activeTab={activeTab}
+        rutas={rutas}
+        vehiculos={vehiculos}
+        conductores={conductores}
+        alumnos={alumnos}
+      />
+
+      {loading
+        ? <div className="card" style={{ padding: '28px', fontWeight: '800', color: 'var(--text-muted)' }}>Generando reporte...</div>
+        : renderReport(activeTab, data, filters)
+      }
+
       <Toast mensaje={toast.mensaje} tipo={toast.tipo} onClose={() => setToast({ mensaje: '', tipo: '' })} />
     </div>
   );

@@ -1,9 +1,6 @@
 import { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  Bus, Users, LayoutDashboard, LogOut,
-  UserSquare2, MapPin, GraduationCap, Map, Activity, History, BarChart3
-} from 'lucide-react';
+import { Bus, Users, LayoutDashboard, LogOut, UserSquare2, MapPin, GraduationCap, Map, Activity, BarChart3, Wrench } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
 const NOMBRE_ROL = { 1: 'Administrador', 2: 'Conductor', 3: 'Padre', 4: 'Estudiante' };
@@ -43,12 +40,12 @@ const Sidebar = ({ abierto, onCerrar }) => {
           <NavLink to="/dashboard"   className={navClass} onClick={handleNavClick}><LayoutDashboard size={22} /> Dashboard</NavLink>
           <NavLink to="/usuarios"    className={navClass} onClick={handleNavClick}><Users size={22} /> Usuarios</NavLink>
           <NavLink to="/vehiculos"   className={navClass} onClick={handleNavClick}><Bus size={22} /> Vehículos</NavLink>
+          <NavLink to="/mantenimientos" className={navClass} onClick={handleNavClick}><Wrench size={20} /> Mantenimientos</NavLink>
           <NavLink to="/conductores" className={navClass} onClick={handleNavClick}><UserSquare2 size={22} /> Conductores</NavLink>
           <NavLink to="/rutas"       className={navClass} onClick={handleNavClick}><MapPin size={22} /> Rutas</NavLink>
           <NavLink to="/alumnos"     className={navClass} onClick={handleNavClick}><GraduationCap size={22} /> Alumnos</NavLink>
           <NavLink to="/asistencias" className={navClass} onClick={handleNavClick}><Map size={22} /> Asistencia</NavLink>
           <NavLink to="/monitoreo"   className={navClass} onClick={handleNavClick}><Activity size={22} /> Monitoreo en Vivo</NavLink>
-          <NavLink to="/historial"   className={navClass} onClick={handleNavClick}><History size={22} /> Reportes Históricos</NavLink>
           <NavLink to="/reportes"    className={navClass} onClick={handleNavClick}><BarChart3 size={22} /> Reportes</NavLink>
         </>}
 

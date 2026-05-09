@@ -26,6 +26,8 @@ const Usuarios = () => {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [usuarioAEditar, setUsuarioAEditar] = useState(null);
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
+  const [accionMasiva, setAccionMasiva] = useState(null);
+  const [procesandoMasivo, setProcesandoMasivo] = useState(false);
   const [seleccionados, setSeleccionados] = useState([]);
   const [toast, setToast] = useState({ mensaje: '', tipo: '' });
   const [paginaActual, setPaginaActual] = useState(1);
@@ -144,23 +146,42 @@ const Usuarios = () => {
     setSeleccionados(checked ? usuariosPaginados.map((usuario) => usuario.UsuarioID) : []);
   };
 
-  const handleAccionMasiva = async (accion, estado = null) => {
-    if (seleccionados.length === 0) return;
+const ejecutarAccionMasiva = async () => {
+  if (!accionMasiva || seleccionados.length === 0) {
+    setAccionMasiva(null);
+    return;
+  }
 
-    if (!window.confirm(`¿Aplicar esta acción a ${seleccionados.length} usuario(s)?`)) return;
+  setProcesandoMasivo(true);
 
-    try {
-      const promesas = seleccionados.map((id) =>
-        accion === 'eliminar' ? eliminarUsuarioFisico(id) : toggleEstadoUsuario(id, estado)
-      );
+  try {
+    const { tipo, estado } = accionMasiva;
 
-      await Promise.all(promesas);
-      mostrarToast('Acción masiva completada', 'success');
-      await cargarDatos();
-    } catch (error) {
-      mostrarToast(error.response?.data?.mensaje || 'Error en acción masiva', 'error');
-    }
-  };
+    const promesas = seleccionados.map((id) =>
+      tipo === 'eliminar' ? eliminarUsuarioFisico(id) : toggleEstadoUsuario(id, estado)
+    );
+
+    await Promise.all(promesas);
+
+    mostrarToast('Acción masiva completada', 'success');
+    setAccionMasiva(null);
+    await cargarDatos();
+  } catch (error) {
+    mostrarToast(error.response?.data?.mensaje || 'Error en acción masiva', 'error');
+  } finally {
+    setProcesandoMasivo(false);
+  }
+};
+
+  const handleAccionMasiva = (accion, estado = null) => {
+  if (seleccionados.length === 0) return;
+
+  // En lugar de window.confirm, abrimos el modal del sistema
+  setAccionMasiva({
+    tipo: accion === 'eliminar' ? 'eliminar' : 'estado',
+    estado: accion === 'eliminar' ? null : estado
+  });
+};
 
   const exportarCSV = () => {
     if (usuariosFiltrados.length === 0) {
@@ -333,6 +354,21 @@ const Usuarios = () => {
           onConfirm={confirmarYeliminar}
         />
       )}
+
+      {accionMasiva && (
+  <ConfirmarEliminarModal
+    mensaje={
+      accionMasiva.tipo === 'eliminar'
+        ? `¿Eliminar a ${seleccionados.length} usuario(s) seleccionado(s)?`
+        : `¿${accionMasiva.estado ? 'Activar' : 'Desactivar'} a ${seleccionados.length} usuario(s) seleccionado(s)?`
+    }
+    onClose={() => {
+      if (procesandoMasivo) return; // evita cerrar mientras ejecuta
+      setAccionMasiva(null);
+    }}
+    onConfirm={ejecutarAccionMasiva}
+  />
+)}
 
       <Toast
         mensaje={toast.mensaje}

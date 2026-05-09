@@ -215,10 +215,11 @@ const DashboardConductor = () => {
   };
 
   const ejecutarConfirm = async () => {
-    const accion = confirm?.accion;
-    setConfirm(null);
-    if (accion) await accion();
-  };
+  console.log('>>> ejecutarConfirm llamado, accion:', typeof confirm?.accion);
+  const accion = confirm?.accion;
+  setConfirm(null);
+  if (accion) await accion();
+};
 
   const viajeId = sesion?.viaje?.ViajeID;
 
@@ -491,69 +492,105 @@ const DashboardConductor = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-      <div className="page-header">
-        <div>
-          <h1>Mi Panel</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontWeight: '700' }}>
+      {/* ── Header del conductor ── */}
+      <div style={{
+        background: 'white',
+        borderRadius: '16px',
+        padding: '24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+      }}>
+        <div style={{ marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0 }}>Mi Panel</h1>
+          <p style={{ color: 'var(--text-muted)', fontWeight: '500', margin: '4px 0 0' }}>
             {user?.nombre} — Ruta: {user?.nombreRuta || '—'}
           </p>
         </div>
-      </div>
 
-      <div
-        style={{
+        <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '14px'
-        }}
-      >
-        <div className="stat-card">
-          <Bus size={22} color="var(--primary)" />
-          <span>RUTA</span>
-          <strong>{user?.nombreRuta || '—'}</strong>
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '12px',
+          marginBottom: '20px'
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            background: '#eff6ff', borderRadius: '12px', padding: '14px 16px',
+            borderLeft: '4px solid #3b82f6'
+          }}>
+            <Bus size={20} color="#3b82f6" />
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ruta</p>
+              <p style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{user?.nombreRuta || '—'}</p>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            background: '#f0fdf4', borderRadius: '12px', padding: '14px 16px',
+            borderLeft: '4px solid #22c55e'
+          }}>
+            <Clock size={20} color="#22c55e" />
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Turno</p>
+              <p style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{turnoLabel}</p>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            background: gpsActivo ? '#f0fdf4' : '#fef2f2',
+            borderRadius: '12px', padding: '14px 16px',
+            borderLeft: `4px solid ${gpsActivo ? '#22c55e' : '#ef4444'}`
+          }}>
+            <Navigation size={20} color={gpsActivo ? '#22c55e' : '#ef4444'} />
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>GPS</p>
+              <p style={{ fontSize: '14px', fontWeight: '800', color: gpsActivo ? '#22c55e' : '#ef4444', margin: 0 }}>
+                {gpsActivo ? 'Activo' : 'Inactivo'}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <Clock size={22} color="var(--primary)" />
-          <span>TURNO</span>
-          <strong>{turnoLabel}</strong>
-        </div>
+        <div style={{
+          background: '#f8fafc',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: '#64748b', margin: 0 }}>Estado del turno</p>
+            <p style={{
+              fontSize: '1.1rem', fontWeight: '800', margin: '2px 0 0',
+              color: turnoAbierto ? '#059669' : '#0f172a'
+            }}>
+              {turnoAbierto ? 'Turno Abierto' : 'Sin turno activo'}
+            </p>
+            {turnoAbierto && turno?.HoraApertura && (
+              <p style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '13px', margin: '2px 0 0' }}>
+                Desde las {new Date(turno.HoraApertura).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
 
-        <div className="stat-card">
-          <Navigation size={22} color={gpsActivo ? '#059669' : 'var(--text-muted)'} />
-          <span>GPS</span>
-          <strong style={{ color: gpsActivo ? '#059669' : 'var(--text-muted)' }}>
-            {gpsActivo ? 'Activo' : 'Inactivo'}
-          </strong>
-        </div>
-      </div>
-
-      <div className="table-card" style={{ padding: '20px' }}>
-        <h3 style={{ marginBottom: '8px' }}>Estado del turno</h3>
-        <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: turnoAbierto ? '#059669' : '#0f172a' }}>
-          {turnoAbierto ? 'Turno Abierto' : 'Sin turno activo'}
-        </h4>
-
-        {turnoAbierto && turno?.HoraApertura && (
-          <p style={{ color: 'var(--text-muted)', fontWeight: '700', marginTop: '4px' }}>
-            Desde las {new Date(turno.HoraApertura).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        )}
-
-        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
-          {!turnoAbierto && (
-            <button type="button" className="btn-primary" onClick={handleAbrirTurno}>
-              <PlayCircle size={20} />
-              Iniciar Turno
-            </button>
-          )}
-
-          {turnoAbierto && !viajeEnCurso && (
-            <button type="button" className="btn-secondary" onClick={handleCerrarTurno}>
-              <StopCircle size={20} />
-              Cerrar Turno
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {!turnoAbierto && (
+              <button type="button" className="btn-primary" onClick={handleAbrirTurno}>
+                <PlayCircle size={18} />
+                Iniciar Turno
+              </button>
+            )}
+            {turnoAbierto && !viajeEnCurso && (
+              <button type="button" className="btn-secondary" onClick={handleCerrarTurno}>
+                <StopCircle size={18} />
+                Cerrar Turno
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

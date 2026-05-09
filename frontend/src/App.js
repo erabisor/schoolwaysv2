@@ -121,7 +121,7 @@ function App() {
           />
 
           <Route
-            path="/monitoreo-turnos"
+            path="/monitoreo"
             element={
               <ProtectedRoute rolesPermitidos={[1]}>
                 <MonitoreoTurnos />

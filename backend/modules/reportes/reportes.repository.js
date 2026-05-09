@@ -1,21 +1,50 @@
 const { sql, poolPromise } = require('../../config/db');
 
+/* ── Parsear multi-valor (viene "5,12,8" o "5" o "") ── */
+const parseIds = (valor) => {
+  if (!valor) return [];
+  return String(valor)
+    .split(',')
+    .map((v) => Number(v.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+};
+
+/* ── Inyectar IDs como parámetros y generar condición IN ── */
+const agregarFiltroIN = (request, ids, prefijo, columna) => {
+  if (!ids.length) return '';
+  const params = ids.map((id, i) => {
+    const nombre = `${prefijo}${i}`;
+    request.input(nombre, sql.Int, id);
+    return `@${nombre}`;
+  });
+  return ` AND ${columna} IN (${params.join(',')})`;
+};
+
+const parseStrings = (valor) => {
+  if (!valor) return [];
+  return String(valor).split(',').map((v) => v.trim()).filter(Boolean);
+};
+
+const agregarFiltroINVarchar = (request, valores, prefijo, columna) => {
+  if (!valores.length) return '';
+  const params = valores.map((val, i) => {
+    const nombre = `${prefijo}${i}`;
+    request.input(nombre, sql.VarChar, val);
+    return `@${nombre}`;
+  });
+  return ` AND ${columna} IN (${params.join(',')})`;
+};
+
 const inputComun = (request, filtros) => {
   request.input('fechaInicio', sql.Date, filtros.fechaInicio);
   request.input('fechaFin', sql.Date, filtros.fechaFin);
-  if (filtros.rutaId) request.input('rutaId', sql.Int, filtros.rutaId);
-  if (filtros.alumnoId) request.input('alumnoId', sql.Int, filtros.alumnoId);
-  if (filtros.conductorId) request.input('conductorId', sql.Int, filtros.conductorId);
-  if (filtros.vehiculoId) request.input('vehiculoId', sql.Int, filtros.vehiculoId);
-  if (filtros.tipoEvento) request.input('tipoEvento', sql.VarChar, filtros.tipoEvento);
-  if (filtros.sentido) request.input('sentido', sql.VarChar, filtros.sentido);
-  if (filtros.estado) request.input('estado', sql.VarChar, filtros.estado);
   return request;
 };
 
 const resumen = async (filtros) => {
   const pool = await poolPromise;
   const request = inputComun(pool.request(), filtros);
+
   const result = await request.query(`
     SELECT
       (SELECT COUNT(*) FROM Alumnos WHERE Estado = 1 AND Eliminado = 0) AS AlumnosActivos,
@@ -53,53 +82,15 @@ const resumen = async (filtros) => {
   return { kpis: result.recordset[0], eventosPorDia: eventosPorDia.recordset, topRutas: rutasUso.recordset };
 };
 
-const asistenciaEstudiante = async (filtros) => {
-  const pool = await poolPromise;
-  let where = `WHERE asi.Estado = 1 AND CAST(asi.FechaHora AS DATE) BETWEEN @fechaInicio AND @fechaFin AND a.Eliminado = 0`;
-  if (filtros.rutaId) where += ' AND asi.RutaID = @rutaId';
-  if (filtros.alumnoId) where += ' AND asi.AlumnoID = @alumnoId';
-  if (filtros.tipoEvento) where += ' AND asi.TipoEvento = @tipoEvento';
-  if (filtros.sentido) where += ' AND asi.Sentido = @sentido';
-
-  const resumen = await inputComun(pool.request(), filtros).query(`
-    SELECT a.AlumnoID, a.Nombre + ' ' + a.Apellido AS Alumno, a.Grado, a.Seccion,
-      r.NombreRuta,
-      SUM(CASE WHEN asi.TipoEvento = 'Abordó' THEN 1 ELSE 0 END) AS Abordajes,
-      SUM(CASE WHEN asi.TipoEvento = 'Bajó' THEN 1 ELSE 0 END) AS Bajadas,
-      SUM(CASE WHEN asi.TipoEvento = 'Ausente' THEN 1 ELSE 0 END) AS Ausencias,
-      SUM(CASE WHEN asi.TipoEvento = 'AvisóAusencia' THEN 1 ELSE 0 END) AS AvisosAusencia,
-      COUNT(*) AS TotalEventos
-    FROM Asistencias asi
-    INNER JOIN Alumnos a ON asi.AlumnoID = a.AlumnoID
-    LEFT JOIN Rutas r ON asi.RutaID = r.RutaID
-    ${where}
-    GROUP BY a.AlumnoID, a.Nombre, a.Apellido, a.Grado, a.Seccion, r.NombreRuta
-    ORDER BY Alumno ASC
-  `);
-
-  const detalle = await inputComun(pool.request(), filtros).query(`
-    SELECT asi.AsistenciaID, asi.FechaHora, a.Nombre + ' ' + a.Apellido AS Alumno,
-      a.Grado, a.Seccion, r.NombreRuta, u.NombreCompleto AS Conductor,
-      asi.Sentido, asi.TipoEvento, asi.Turno, asi.Observaciones
-    FROM Asistencias asi
-    INNER JOIN Alumnos a ON asi.AlumnoID = a.AlumnoID
-    LEFT JOIN Rutas r ON asi.RutaID = r.RutaID
-    LEFT JOIN Conductores c ON asi.ConductorID = c.ConductorID
-    LEFT JOIN Usuarios u ON c.UsuarioID = u.UsuarioID
-    ${where}
-    ORDER BY asi.FechaHora DESC
-  `);
-
-  return { resumen: resumen.recordset, detalle: detalle.recordset };
-};
-
 const usoRutas = async (filtros) => {
   const pool = await poolPromise;
-  let filtroViajes = 'WHERE v.Fecha BETWEEN @fechaInicio AND @fechaFin';
-  if (filtros.rutaId) filtroViajes += ' AND v.RutaID = @rutaId';
-  if (filtros.sentido) filtroViajes += ' AND v.Sentido = @sentido';
+  const rutaIds = parseIds(filtros.rutaId);
 
-  const resumen = await inputComun(pool.request(), filtros).query(`
+  // Resumen
+  const reqResumen = inputComun(pool.request(), filtros);
+  const filtroRutaResumen = agregarFiltroIN(reqResumen, rutaIds, 'rId', 'r.RutaID');
+
+  const resumen = await reqResumen.query(`
     SELECT r.RutaID, r.NombreRuta, r.Turno,
       COUNT(DISTINCT v.ViajeID) AS Viajes,
       COUNT(DISTINCT al.AlumnoID) AS AlumnosAsignados,
@@ -110,12 +101,18 @@ const usoRutas = async (filtros) => {
     LEFT JOIN Viajes v ON r.RutaID = v.RutaID AND v.Fecha BETWEEN @fechaInicio AND @fechaFin
     LEFT JOIN Alumnos al ON r.RutaID = al.RutaID AND al.Eliminado = 0
     LEFT JOIN Asistencias asi ON r.RutaID = asi.RutaID AND CAST(asi.FechaHora AS DATE) BETWEEN @fechaInicio AND @fechaFin AND asi.Estado = 1
-    WHERE r.Eliminado = 0 ${filtros.rutaId ? 'AND r.RutaID = @rutaId' : ''}
+    WHERE r.Eliminado = 0 ${filtroRutaResumen}
     GROUP BY r.RutaID, r.NombreRuta, r.Turno
     ORDER BY Viajes DESC, r.NombreRuta ASC
   `);
 
-  const detalle = await inputComun(pool.request(), filtros).query(`
+  // Detalle
+  const reqDetalle = inputComun(pool.request(), filtros);
+  let filtroViajes = 'WHERE v.Fecha BETWEEN @fechaInicio AND @fechaFin';
+  filtroViajes += agregarFiltroIN(reqDetalle, rutaIds, 'rdId', 'v.RutaID');
+  filtroViajes += agregarFiltroINVarchar(reqDetalle, parseStrings(filtros.sentido), 'sen', 'v.Sentido');
+
+  const detalle = await reqDetalle.query(`
     SELECT v.ViajeID, v.Fecha, r.NombreRuta, v.Sentido, v.EstadoViaje,
       v.HoraInicio, v.HoraFin,
       DATEDIFF(MINUTE, v.HoraInicio, ISNULL(v.HoraFin, GETDATE())) AS DuracionMinutos,
@@ -135,11 +132,14 @@ const usoRutas = async (filtros) => {
 
 const mantenimientoVehiculos = async (filtros) => {
   const pool = await poolPromise;
-  let where = `WHERE m.Eliminado = 0 AND ISNULL(m.FechaProgramada, m.FechaRegistro) >= @fechaInicio AND ISNULL(m.FechaProgramada, m.FechaRegistro) < DATEADD(DAY, 1, @fechaFin)`;
-  if (filtros.vehiculoId) where += ' AND m.VehiculoID = @vehiculoId';
-  if (filtros.estado) where += ' AND m.EstadoMantenimiento = @estado';
+  const vehiculoIds = parseIds(filtros.vehiculoId);
+  const rutaIds = parseIds(filtros.rutaId);
 
-  const resumen = await inputComun(pool.request(), filtros).query(`
+  // Resumen
+  const reqResumen = inputComun(pool.request(), filtros);
+  const filtroVehResumen = agregarFiltroIN(reqResumen, vehiculoIds, 'vId', 'v.VehiculoID');
+
+  const resumen = await reqResumen.query(`
     SELECT v.VehiculoID, v.Placa, v.Marca, v.Modelo,
       COUNT(m.MantenimientoID) AS TotalMantenimientos,
       SUM(CASE WHEN m.EstadoMantenimiento = 'En Proceso' THEN 1 ELSE 0 END) AS EnProceso,
@@ -150,20 +150,79 @@ const mantenimientoVehiculos = async (filtros) => {
       AND m.Eliminado = 0
       AND ISNULL(m.FechaProgramada, m.FechaRegistro) >= @fechaInicio
       AND ISNULL(m.FechaProgramada, m.FechaRegistro) < DATEADD(DAY, 1, @fechaFin)
-    WHERE v.Eliminado = 0 ${filtros.vehiculoId ? 'AND v.VehiculoID = @vehiculoId' : ''}
+    WHERE v.Eliminado = 0 ${filtroVehResumen}
     GROUP BY v.VehiculoID, v.Placa, v.Marca, v.Modelo
     ORDER BY Criticos DESC, EnProceso DESC, CostoTotal DESC
   `);
 
-  const detalle = await inputComun(pool.request(), filtros).query(`
+  // Detalle
+  const reqDetalle = inputComun(pool.request(), filtros);
+  let whereDetalle = `WHERE m.Eliminado = 0 AND ISNULL(m.FechaProgramada, m.FechaRegistro) >= @fechaInicio AND ISNULL(m.FechaProgramada, m.FechaRegistro) < DATEADD(DAY, 1, @fechaFin)`;
+  whereDetalle += agregarFiltroIN(reqDetalle, vehiculoIds, 'vdId', 'm.VehiculoID');
+  whereDetalle += agregarFiltroINVarchar(reqDetalle, parseStrings(filtros.estado), 'est', 'm.EstadoMantenimiento');
+
+  const detalle = await reqDetalle.query(`
     SELECT m.MantenimientoID, v.Placa, v.Marca, v.Modelo,
       m.TipoMantenimiento, m.EstadoMantenimiento, m.Prioridad, m.Descripcion,
       m.FechaProgramada, m.FechaInicio, m.FechaFinalizacion, m.ProximoMantenimiento,
       m.Kilometraje, m.Costo, m.Taller, m.Responsable, m.Observaciones
     FROM MantenimientosVehiculos m
     INNER JOIN Vehiculos v ON m.VehiculoID = v.VehiculoID
-    ${where}
+    ${whereDetalle}
     ORDER BY m.Prioridad DESC, m.FechaProgramada DESC
+  `);
+
+  return { resumen: resumen.recordset, detalle: detalle.recordset };
+};
+
+const asistenciaEstudiante = async (filtros) => {
+  const pool = await poolPromise;
+  const rutaIds = parseIds(filtros.rutaId);
+  const alumnoIds = parseIds(filtros.alumnoId);
+
+  // Resumen
+  const reqResumen = inputComun(pool.request(), filtros);
+  let whereResumen = `WHERE asi.Estado = 1 AND CAST(asi.FechaHora AS DATE) BETWEEN @fechaInicio AND @fechaFin AND a.Eliminado = 0`;
+  whereResumen += agregarFiltroIN(reqResumen, rutaIds, 'rId', 'asi.RutaID');
+  whereResumen += agregarFiltroIN(reqResumen, alumnoIds, 'aId', 'asi.AlumnoID');
+  whereResumen += agregarFiltroINVarchar(reqResumen, parseStrings(filtros.tipoEvento), 'evt', 'asi.TipoEvento');
+  whereResumen += agregarFiltroINVarchar(reqResumen, parseStrings(filtros.sentido), 'sen', 'asi.Sentido');
+
+  const resumen = await reqResumen.query(`
+    SELECT a.AlumnoID, a.Nombre + ' ' + a.Apellido AS Alumno, a.Grado, a.Seccion,
+      r.NombreRuta,
+      SUM(CASE WHEN asi.TipoEvento = 'Abordó' THEN 1 ELSE 0 END) AS Abordajes,
+      SUM(CASE WHEN asi.TipoEvento = 'Bajó' THEN 1 ELSE 0 END) AS Bajadas,
+      SUM(CASE WHEN asi.TipoEvento = 'Ausente' THEN 1 ELSE 0 END) AS Ausencias,
+      SUM(CASE WHEN asi.TipoEvento = 'AvisóAusencia' THEN 1 ELSE 0 END) AS AvisosAusencia,
+      COUNT(*) AS TotalEventos
+    FROM Asistencias asi
+    INNER JOIN Alumnos a ON asi.AlumnoID = a.AlumnoID
+    LEFT JOIN Rutas r ON asi.RutaID = r.RutaID
+    ${whereResumen}
+    GROUP BY a.AlumnoID, a.Nombre, a.Apellido, a.Grado, a.Seccion, r.NombreRuta
+    ORDER BY Alumno ASC
+  `);
+
+  // Detalle
+  const reqDetalle = inputComun(pool.request(), filtros);
+  let whereDetalle = `WHERE asi.Estado = 1 AND CAST(asi.FechaHora AS DATE) BETWEEN @fechaInicio AND @fechaFin AND a.Eliminado = 0`;
+  whereDetalle += agregarFiltroIN(reqDetalle, rutaIds, 'rdId', 'asi.RutaID');
+  whereDetalle += agregarFiltroIN(reqDetalle, alumnoIds, 'adId', 'asi.AlumnoID');
+  whereDetalle += agregarFiltroINVarchar(reqDetalle, parseStrings(filtros.tipoEvento), 'devt', 'asi.TipoEvento');
+  whereDetalle += agregarFiltroINVarchar(reqDetalle, parseStrings(filtros.sentido), 'dsen', 'asi.Sentido');
+
+  const detalle = await reqDetalle.query(`
+    SELECT asi.AsistenciaID, asi.FechaHora, a.Nombre + ' ' + a.Apellido AS Alumno,
+      a.Grado, a.Seccion, r.NombreRuta, u.NombreCompleto AS Conductor,
+      asi.Sentido, asi.TipoEvento, asi.Turno, asi.Observaciones
+    FROM Asistencias asi
+    INNER JOIN Alumnos a ON asi.AlumnoID = a.AlumnoID
+    LEFT JOIN Rutas r ON asi.RutaID = r.RutaID
+    LEFT JOIN Conductores c ON asi.ConductorID = c.ConductorID
+    LEFT JOIN Usuarios u ON c.UsuarioID = u.UsuarioID
+    ${whereDetalle}
+    ORDER BY asi.FechaHora DESC
   `);
 
   return { resumen: resumen.recordset, detalle: detalle.recordset };
@@ -171,12 +230,16 @@ const mantenimientoVehiculos = async (filtros) => {
 
 const viajes = async (filtros) => {
   const pool = await poolPromise;
-  let where = 'WHERE v.Fecha BETWEEN @fechaInicio AND @fechaFin';
-  if (filtros.rutaId) where += ' AND v.RutaID = @rutaId';
-  if (filtros.conductorId) where += ' AND t.ConductorID = @conductorId';
-  if (filtros.sentido) where += ' AND v.Sentido = @sentido';
+  const rutaIds = parseIds(filtros.rutaId);
+  const conductorIds = parseIds(filtros.conductorId);
 
-  const detalle = await inputComun(pool.request(), filtros).query(`
+  const request = inputComun(pool.request(), filtros);
+  let where = 'WHERE v.Fecha BETWEEN @fechaInicio AND @fechaFin';
+  where += agregarFiltroIN(request, rutaIds, 'rId', 'v.RutaID');
+  where += agregarFiltroIN(request, conductorIds, 'cId', 't.ConductorID');
+  where += agregarFiltroINVarchar(request, parseStrings(filtros.sentido), 'sen', 'v.Sentido');
+
+  const detalle = await request.query(`
     SELECT v.ViajeID, v.Fecha, r.NombreRuta, v.Sentido, v.EstadoViaje,
       v.HoraInicio, v.HoraFin,
       DATEDIFF(MINUTE, v.HoraInicio, ISNULL(v.HoraFin, GETDATE())) AS DuracionMinutos,
@@ -196,11 +259,15 @@ const viajes = async (filtros) => {
 
 const turnos = async (filtros) => {
   const pool = await poolPromise;
-  let where = 'WHERE t.Fecha BETWEEN @fechaInicio AND @fechaFin';
-  if (filtros.rutaId) where += ' AND t.RutaID = @rutaId';
-  if (filtros.conductorId) where += ' AND t.ConductorID = @conductorId';
+  const rutaIds = parseIds(filtros.rutaId);
+  const conductorIds = parseIds(filtros.conductorId);
 
-  const detalle = await inputComun(pool.request(), filtros).query(`
+  const request = inputComun(pool.request(), filtros);
+  let where = 'WHERE t.Fecha BETWEEN @fechaInicio AND @fechaFin';
+  where += agregarFiltroIN(request, rutaIds, 'rId', 't.RutaID');
+  where += agregarFiltroIN(request, conductorIds, 'cId', 't.ConductorID');
+
+  const detalle = await request.query(`
     SELECT t.TurnoConductorID, t.Fecha, r.NombreRuta, r.Turno AS TurnoRuta,
       u.NombreCompleto AS Conductor, t.EstadoTurno, t.HoraApertura, t.HoraCierre,
       DATEDIFF(MINUTE, t.HoraApertura, ISNULL(t.HoraCierre, GETDATE())) AS DuracionMinutos,
