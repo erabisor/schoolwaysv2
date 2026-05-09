@@ -15,7 +15,8 @@ const viajesRoutes = require('./modules/viajes/viajes.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const padresRoutes = require('./modules/padres/padres.routes');
 const mantenimientosRoutes = require('./modules/mantenimientos/mantenimientos.routes');
-
+const pushRoutes = require('./modules/push/push.routes');
+const reportesRoutes = require('./modules/reportes/reportes.routes');
 
 const app = express();
 
@@ -71,7 +72,8 @@ app.use('/api/viajes', viajesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/padres', padresRoutes);
 app.use('/api/mantenimientos', mantenimientosRoutes);
-
+app.use('/api/push', pushRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[app] Error:', err.message);

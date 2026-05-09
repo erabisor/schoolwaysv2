@@ -49,6 +49,18 @@ const Sidebar = ({ abierto, onCerrar }) => {
           <NavLink to="/reportes"    className={navClass} onClick={handleNavClick}><BarChart3 size={22} /> Reportes</NavLink>
         </>}
 
+{user?.rol === 3 && <>
+            <NavLink to="/padre" className={navClass} onClick={handleNavClick} end>
+              <LayoutDashboard size={20} /> Inicio
+            </NavLink>
+            <NavLink to="/padre/historial" className={navClass} onClick={handleNavClick}>
+              <Activity size={20} /> Historial
+            </NavLink>
+            <NavLink to="/padre/notificaciones" className={navClass} onClick={handleNavClick}>
+              <MapPin size={20} /> Notificaciones
+            </NavLink>
+          </>}
+
         {esConductor && <>
           <NavLink to="/conductor" className={navClass} onClick={handleNavClick}><LayoutDashboard size={22} /> Mi Panel</NavLink>
         </>}

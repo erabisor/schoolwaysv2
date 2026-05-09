@@ -1,17 +1,15 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Bus, History, RefreshCw, UsersRound } from 'lucide-react';
+import { Bus, RefreshCw, UsersRound } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import Toast from '../../components/Toast';
 import HijoCard from './HijoCard';
 import EstadoTransporteCard from './EstadoTransporteCard';
-import HistorialSemanal from './HistorialSemanal';
 import MapaSeguimientoPadre from './MapaSeguimientoPadre';
-import NotificacionesPadre from './NotificacionesPadre';
 import {
   getHijosPadre,
-  getHistorialSemanalPadre,
   getTransporteHoyPadre
 } from './padre.api';
+import NotificacionBell from './NotificacionBell';
 
 const KpiCard = ({ label, value, icon, bg, color }) => (
   <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -46,7 +44,6 @@ const PortalPadre = () => {
   const { user } = useContext(AuthContext);
   const [hijos, setHijos] = useState([]);
   const [estados, setEstados] = useState([]);
-  const [historial, setHistorial] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [toast, setToast] = useState({ mensaje: '', tipo: '' });
 
@@ -54,15 +51,13 @@ const PortalPadre = () => {
     setCargando(true);
 
     try {
-      const [resHijos, resEstados, resHistorial] = await Promise.all([
+      const [resHijos, resEstados] = await Promise.all([
         getHijosPadre(),
-        getTransporteHoyPadre(),
-        getHistorialSemanalPadre()
+        getTransporteHoyPadre()
       ]);
 
       setHijos(resHijos.data.data || []);
       setEstados(resEstados.data.data || []);
-      setHistorial(resHistorial.data.data || []);
     } catch (error) {
       setToast({
         mensaje: error.response?.data?.mensaje || 'No se pudo cargar el portal del padre',
@@ -81,7 +76,7 @@ const PortalPadre = () => {
     return estados.filter((estado) => estado.EstadoViaje === 'En Curso' && estado.ViajeID);
   }, [estados]);
 
-  const ultimoEvento = historial[0]?.TipoEvento || 'Sin eventos';
+const ultimoEvento = estados[0]?.TipoEvento || 'Sin eventos';
 
   if (cargando) {
     return (
@@ -92,8 +87,10 @@ const PortalPadre = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <NotificacionBell />
       <div className="page-header">
+
         <div>
           <h1>Portal del Padre</h1>
           <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontWeight: '600' }}>
@@ -129,13 +126,11 @@ const PortalPadre = () => {
         <KpiCard
           label="Último evento"
           value={ultimoEvento}
-          icon={<History size={22} />}
+          icon={<Bus size={22} />}
           bg="#fef3c7"
           color="#d97706"
         />
       </div>
-
-      <NotificacionesPadre />
 
       {hijos.length === 0 ? (
         <div className="card" style={{ padding: '24px', color: 'var(--text-muted)', fontWeight: '800', textAlign: 'center' }}>
@@ -191,8 +186,6 @@ const PortalPadre = () => {
               </div>
             )}
           </section>
-
-          <HistorialSemanal historial={historial} />
         </>
       )}
 

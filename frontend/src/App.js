@@ -22,6 +22,39 @@ import Mantenimientos from './modules/mantenimientos/Mantenimientos';
 import Reportes from './modules/reportes/Reportes';
 import DashboardConductor from './modules/conductor/DashboardConductor';
 import PortalPadre from './modules/padre/PortalPadre';
+import NotificacionesPadre from './modules/padre/NotificacionesPadre';
+import HistorialSemanal from './modules/padre/HistorialSemanal';
+
+const HistorialPadrePage = () => {
+  const [historial, setHistorial] = React.useState([]);
+  const [cargando, setCargando] = React.useState(true);
+
+  React.useEffect(() => {
+    const cargar = async () => {
+      try {
+        const { getHistorialSemanalPadre } = await import('./modules/padre/padre.api');
+        const res = await getHistorialSemanalPadre();
+        setHistorial(res.data.data || []);
+      } catch (e) {
+        console.error('[HistorialPadre]', e.message);
+      } finally {
+        setCargando(false);
+      }
+    };
+    cargar();
+  }, []);
+
+  if (cargando) return <div style={{ padding: '32px', fontWeight: '800', color: '#94a3b8' }}>Cargando historial...</div>;
+
+  return (
+    <div>
+      <div className="page-header" style={{ marginBottom: '18px' }}>
+        <h1>Historial Semanal</h1>
+      </div>
+      <HistorialSemanal historial={historial} />
+    </div>
+  );
+};
 
 const PortalEstudiante = () => (
   <div className="card" style={{ padding: '24px' }}>
@@ -161,6 +194,24 @@ function App() {
             element={
               <ProtectedRoute rolesPermitidos={[3]}>
                 <PortalPadre />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/padre/notificaciones"
+            element={
+              <ProtectedRoute rolesPermitidos={[3]}>
+                <NotificacionesPadre />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/padre/historial"
+            element={
+              <ProtectedRoute rolesPermitidos={[3]}>
+                <HistorialPadrePage />
               </ProtectedRoute>
             }
           />

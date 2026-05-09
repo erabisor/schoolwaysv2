@@ -2,6 +2,9 @@ const { sql, poolPromise } = require('../../config/db');
 let emailService = {};
 try { emailService = require('../../utils/email.service'); } catch (_) { emailService = {}; }
 
+let pushService = {};
+try { pushService = require('../../utils/pushService'); } catch (_) { pushService = {}; }
+
 const EVENTO_MENSAJE = {
   'Abordó': 'abordó el bus',
   'Bajó': 'bajó del bus',
@@ -168,6 +171,18 @@ const crearNotificacionPadre = async (pool, datos, nombreRuta) => {
     const { io } = require('../../server');
     if (io) (result.recordset || []).forEach(n => io.to(`usuario-${n.UsuarioID}`).emit('notificacion:nueva', n));
   } catch (e) { console.error('[socket notif padre]', e.message); }
+  // Push notification
+  try {
+    if (pushService.enviarPushAUsuario) {
+      (result.recordset || []).forEach(n => {
+        pushService.enviarPushAUsuario(n.UsuarioID, {
+          title: n.Titulo || 'Transporte escolar',
+          body: n.Mensaje,
+          data: { url: '/padre/notificaciones' },
+        }).catch(e => console.warn('[push notif padre]', e.message));
+      });
+    }
+  } catch (e) { console.warn('[push notif padre]', e.message); }
 };
 
 const abrirTurno = async (conductorId, rutaId, actor = {}) => {

@@ -20,7 +20,14 @@ export const AuthProvider = ({ children }) => {
   const login = (token, userData) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-  setUser(userData);
+    setUser(userData);
+
+    // Suscribir push para padres y conductores
+    if (userData?.rol === 3 || userData?.rol === 2) {
+      import('../utils/pushSubscription').then(({ suscribirPush }) => {
+        suscribirPush(token).catch((e) => console.warn('[push] Error al suscribir:', e.message));
+      });
+    }
   };
 
   // Borra los datos y saca al usuario
