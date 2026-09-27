@@ -2,7 +2,9 @@ import React from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
 
 // Reemplaza window.confirm — muestra un modal dentro del sistema
-const ConfirmarAccionModal = ({ titulo, mensaje, onConfirm, onClose, tipo = 'warning' }) => {
+const ConfirmarAccionModal = ({ titulo, mensaje, onConfirm, onConfirmar, onClose, onCancelar, tipo = 'warning' }) => {
+  const handleConfirm = onConfirmar || onConfirm;
+  const handleClose = onCancelar || onClose;
   const esWarning = tipo === 'warning';
 
   return (
@@ -30,7 +32,7 @@ const ConfirmarAccionModal = ({ titulo, mensaje, onConfirm, onClose, tipo = 'war
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               flex: 1, padding: '12px', background: '#f1f5f9',
               color: 'var(--text-muted)', borderRadius: '10px',
@@ -40,7 +42,7 @@ const ConfirmarAccionModal = ({ titulo, mensaje, onConfirm, onClose, tipo = 'war
             Cancelar
           </button>
           <button
-            onClick={onConfirm}
+            onClick={handleConfirm}
             style={{
               flex: 1, padding: '12px',
               background: esWarning ? '#ef4444' : 'var(--primary)',

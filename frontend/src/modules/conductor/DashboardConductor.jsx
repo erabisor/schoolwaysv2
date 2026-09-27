@@ -413,7 +413,7 @@ const DashboardConductor = () => {
         : '¿Confirmas el inicio del recorrido de regreso (Colegio → Casa)?',
       async () => {
         try {
-          await iniciarViaje(sesion.turno.TurnoConductorID, user.rutaId, sentido);
+          await iniciarViaje(sesion.turno.TurnoConductorID, sesion.turno.RutaID, sentido);
           mostrarToast(`Viaje de ${sentido} iniciado`, 'success');
           await cargarSesion();
         } catch (error) {
