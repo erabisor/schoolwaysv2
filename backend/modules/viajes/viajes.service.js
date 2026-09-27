@@ -223,9 +223,17 @@ const generarRutaOptimizada = async (rutaIdParam, latStr, lngStr, sentidoParam, 
       paradas: paradasOrdenadas
     };
   } catch (error) {
-    const err = crearError('No se pudo calcular la ruta optimizada con el servicio externo.', 502);
-    err.originalMessage = error.message;
-    throw err;
+    // ORS es un servicio externo no crítico — si falla, retornamos
+    // una respuesta suave en lugar de propagar un 502 que alarma al frontend.
+    const esErrorOrs = error?.response?.status === 403 || error?.response?.status === 429 || error?.code === 'ECONNABORTED';
+    console.warn('[viajes] ORS no disponible:', error.message);
+    return {
+      polilinea: [],
+      paradas: paradasOrdenadas,
+      mensaje: esErrorOrs
+        ? 'Servicio de ruta optimizada no disponible en este momento. El viaje puede continuar normalmente.'
+        : 'No se pudo calcular la ruta optimizada. El viaje puede continuar normalmente.'
+    };
   }
 };
 
