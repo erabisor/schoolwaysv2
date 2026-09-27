@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 
 // URL del backend — la misma base que usa axios
 const SOCKET_URL = process.env.REACT_APP_API_URL
-  ? process.env.REACT_APP_API_URL.replace('/api', '')
+  ? process.env.REACT_APP_API_URL.replace(/\/api\/?$/, '')
   : 'http://localhost:5000';
 
 let socketInstancia = null;

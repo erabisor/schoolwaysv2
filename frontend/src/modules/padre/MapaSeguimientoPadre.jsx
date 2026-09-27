@@ -6,7 +6,7 @@ import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { getUltimaUbicacionBus } from './padre.api';
 
 const SOCKET_URL = process.env.REACT_APP_API_URL
-  ? process.env.REACT_APP_API_URL.replace('/api', '')
+  ? process.env.REACT_APP_API_URL.replace(/\/api\/?$/, '')
   : 'http://localhost:5000';
 
 const CENTRO_EL_SALVADOR = [13.7012, -89.2243];
